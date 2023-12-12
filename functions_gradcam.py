@@ -3,6 +3,7 @@ import numpy as np
 
 from skimage.transform import resize
 
+
 ### GradCam for specific layer
 def grad_cam_3d(img, model_3d, layer, pred_index=None, 
                 inv_hm=False, gcplusplus=True):
@@ -22,6 +23,73 @@ def grad_cam_3d(img, model_3d, layer, pred_index=None,
     with tf.GradientTape() as tape:
         conv_outputs, predictions = grad_model(img)
         if pred_index is None or model_3d.layers[-1].get_config()["activation"] == "sigmoid":
+            pred_index = tf.argmax(predictions[0])
+        class_channel = predictions[:, pred_index] # when sigmoid, pred_index must be None or 0
+
+    # This is the gradient of the output neuron
+    # with regard to the output feature map of the last conv layer
+    grads = tape.gradient(class_channel, conv_outputs)[0]
+    
+    # Average gradients spatially
+    weights = tf.reduce_mean(grads, axis=(0, 1, 2)) # pooled grads
+    
+    # Build a ponderated map of filters according to gradients importance
+    # We multiply each channel in the feature map array
+    # by "how important this channel is" with regard to the top predicted class
+    # then sum all the channels to obtain the heatmap class activation
+    output = conv_outputs[0]    
+    
+    # slower implementation:
+#     cam = np.zeros(output.shape[0:3], dtype=np.float32)
+#     for index, w in enumerate(weights):
+#         cam += w * output[:, :, :, index]
+
+#     capi=resize(cam,(img.shape[1:]))
+#     capi = np.maximum(capi,0)
+#     heatmap = (capi - capi.min()) / (capi.max() - capi.min())
+#     resized_img = img.reshape(img.shape[1:])
+
+    # faster implementation:
+    heatmap = output @ weights[..., tf.newaxis]
+    heatmap = tf.squeeze(heatmap)
+    heatmap = resize(heatmap, img.shape[1:])
+    
+    # For visualization purpose, we will also normalize the heatmap between 0 & 1
+    if inv_hm:
+        heatmap = heatmap * (-1)
+    
+    if gcplusplus:
+        heatmap = tf.maximum(heatmap, 0) / tf.math.reduce_max(heatmap)
+    else:
+        # normalize heatmap between -1 and 1 (absolute max is then -1 or 1)
+        heatmap_min_max = [tf.math.reduce_min(heatmap), tf.math.reduce_max(heatmap)]
+        heatmap_abs_max = tf.math.reduce_max(tf.math.abs(heatmap_min_max))
+        heatmap = heatmap / heatmap_abs_max
+    heatmap = heatmap.numpy()
+    resized_img = img.reshape(img.shape[1:])
+    
+    return heatmap, resized_img
+
+
+### GradCam for specific layer
+def ontram_grad_cam_3d(img, ontram_model, layer, pred_index=None, 
+                       inv_hm=False, gcplusplus=True):
+    # img: 3d image
+    # model_3d: 3d ontram model with loaded weights
+    # layer: layer name of CNN part where gradcam should be applied
+    # pred_index: output channel when sigmoid should always be 0, when softmax 0 favorable, 1 unfavorable
+    # inv_hm: invert heatmap
+    # gcplusplus: use gradcam++ instead of gradcam (only positive values)
+    
+    # First, we create a MODEL that maps the input image to the activations
+    # of the last conv layer as well as the output predictions
+    grad_model = tf.keras.models.Model([ontram_model.inputs], [ontram_model.get_layer(layer).output, ontram_model.output])
+    
+    # Then, we compute the GRADIENT for our input image
+    # with respect to the activations of the last conv layer
+    with tf.GradientTape() as tape:
+        conv_outputs, predictions = grad_model(img)
+        if pred_index is None or ontram_model.layers[-1].get_config()["activation"] == "sigmoid":
             pred_index = tf.argmax(predictions[0])
         class_channel = predictions[:, pred_index] # when sigmoid, pred_index must be None or 0
 
