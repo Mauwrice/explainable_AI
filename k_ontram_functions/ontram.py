@@ -25,7 +25,7 @@ def ontram(mod_baseline, mod_shift = None):
             mod_output = [mod_baseline_output, mod_shift_output]
         mod_output = keras.layers.concatenate(mod_output)
         
-    mod = keras.Model(inputs = mod_input, outputs = mod_output)
+    mod = keras.Model(inputs = mod_input, outputs = mod_output, name = "mod_ontram")
     mod.mod_baseline = mod_baseline
     mod.mod_shift = mod_shift
     

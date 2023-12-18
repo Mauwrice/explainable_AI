@@ -213,8 +213,9 @@ def img_model_linear_final(input_shape, output_shape, activation = "linear"):
     x = keras.layers.Dropout(0.3)(x)
     x = keras.layers.Dense(128, activation = 'relu')(x)
     x = keras.layers.Dropout(0.3)(x)
-    out_ = keras.layers.Dense(output_shape, activation = activation, use_bias = False)(x) 
-    nn_im = keras.Model(inputs = in_, outputs = out_)
+    out_ = keras.layers.Dense(output_shape, activation = activation, use_bias = False, 
+                              name = "dense_complex_intercept")(x) 
+    nn_im = keras.Model(inputs = in_, outputs = out_, name = "mod_complex_intercept")
     return nn_im
 
 
