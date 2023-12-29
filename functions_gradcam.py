@@ -33,7 +33,7 @@ def grad_cam_3d(img, model_3d, layer, pred_index=None,
         # check for right model variant
         if pred_index is None and model_3d.name == "mod_ontram":
             pred_index = 0
-            predictions = predictions * -1
+            predictions = predictions * -1 # ontram predicts cumulative dist therfore invert
         elif pred_index is None or model_3d.layers[-1].get_config().get("activation") == "sigmoid":
             pred_index = tf.argmax(predictions[0])
         class_channel = predictions[:, pred_index] # when sigmoid, pred_index must be None or 0
