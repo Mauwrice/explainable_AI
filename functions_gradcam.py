@@ -31,7 +31,7 @@ def grad_cam_3d(img, model_3d, layer, pred_index=None,
     with tf.GradientTape() as tape:
         conv_outputs, predictions = grad_model(img)
         # check for right model variant
-        if pred_index is None and model_3d.name == "mod_ontram":
+        if model_3d.name == "mod_ontram":
             pred_index = 0
             predictions = predictions * -1 # ontram predicts cumulative dist therfore invert
         elif pred_index is None or model_3d.layers[-1].get_config().get("activation") == "sigmoid":
