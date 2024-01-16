@@ -67,7 +67,10 @@ def plot_heatmap(resized_img, heatmap,
         warnings.warn("plot_heatmap: slices are defined but mode is not set to def. Ignore value of slice!")
 
     if mode == "max" and orig_max == False:
-        slices = np.unravel_index(heatmap.argmax(), heatmap.shape)
+        if hm_positive:
+            slices = np.unravel_index(heatmap.argmax(), heatmap.shape)
+        else:
+            slices = np.unravel_index(np.abs(heatmap).argmax(), heatmap.shape)
     elif mode == "max" and orig_max == True:
         slices = np.unravel_index(resized_img.argmax(), resized_img.shape)
         
