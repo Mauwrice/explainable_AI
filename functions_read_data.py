@@ -297,9 +297,6 @@ def split_data_tabular(id_tab, X, fold):
            
     return (X_train, X_valid, X_test),(X_train_tab, X_valid_tab, X_test_tab), (y_train, y_valid, y_test)
 
-
-
-
 #### graveyard
 
 
@@ -339,11 +336,7 @@ def split_data_tabular_test():
     return df_result
 
 
-
-
-
-
-
+####
 
 
 

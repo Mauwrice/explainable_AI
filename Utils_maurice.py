@@ -382,12 +382,12 @@ def volume_occlusion(volume, res_tab,
     #           heatmap is cut off at the non-occluded prediction probability and only negative impact is shown
     # invert_hm: string, one of ["pred_class", "always", "never"], if "pred_class", heatmap is inverted if
     #           class 1 is predicted, if "always", heatmap is always inverted, if "never", heatmap is never inverted
-    # model_mode: string, one of ["mean", "median", "max"], defines how the heatmaps of the different models are combined
-    # occlusion_stride: scalar, stride of occlusion, if None, stride is set to minimum of occlusion_size
+    # model_mode: string, one of ["mean", "median", "max", "weighted"], defines how the heatmaps of the different models are combined
+    # occlusion_stride: tuple, shape of input volume, if None, stride is set to minimum of occlusion_size
     # input_shape: tuple, shape of input volume
     
     ## Check input
-    valid_modes = ["mean", "median", "max"]
+    valid_modes = ["mean", "median", "max", "weighted"]
     if model_mode not in valid_modes:
         raise ValueError("volume_occlusion: model_mode must be one of %r." % valid_modes)
     
@@ -404,25 +404,36 @@ def volume_occlusion(volume, res_tab,
         occlusion_size = np.array([occlusion_size, occlusion_size, occlusion_size])
     elif len(occlusion_size) != 3:
         raise ValueError('occluson_size must be a scalar or a 3 element array')
-
+  
     if occlusion_stride is None:
-        occlusion_stride = np.min(occlusion_size)
-    elif any(occlusion_stride > occlusion_size):
+        occlusion_stride = np.repeat(np.min(occlusion_size),3)
+    elif len(occlusion_stride) == 1:
+        occlusion_stride = np.repeat(occlusion_stride,3)
+       
+  
+    if np.any(occlusion_stride > occlusion_size):
         raise ValueError('stride must be smaller or equal size')
     
-    if any(occlusion_stride == occlusion_size):
+    if np.any(occlusion_stride == occlusion_size):
         if (not (volume.shape[0] / occlusion_size)[0].is_integer() or
             not (volume.shape[1] / occlusion_size)[1].is_integer() or 
             not (volume.shape[2] / occlusion_size)[2].is_integer()):
             
             raise ValueError('size does not work with this volume')
-    elif any(occlusion_stride != occlusion_size):
-        if (((volume.shape[0]-occlusion_size[0]) % occlusion_stride) != 0 or 
-            ((volume.shape[1]-occlusion_size[1]) % occlusion_stride) != 0 or
-            ((volume.shape[2]-occlusion_size[2]) % occlusion_stride) != 0):
+    elif np.any(occlusion_stride != occlusion_size):
+        if (((volume.shape[0]-occlusion_size[0]) % occlusion_stride[0]) != 0 or 
+            ((volume.shape[1]-occlusion_size[1]) % occlusion_stride[1]) != 0 or
+            ((volume.shape[2]-occlusion_size[2]) % occlusion_stride[2]) != 0):
         
             raise ValueError('shape and size do not match')
     
+    y_pred_class = "y_pred_class_avg"
+    if model_mode == "weighted":
+        weights = res_tab.loc[:, res_tab.columns.str.startswith("weight")].to_numpy().squeeze()
+        y_pred_class += "_w"
+        model_names = list(np.array(model_names)[weights > 0])
+        weights = weights[weights>0] 
+
     ## loop over models
     h_l = []
     for model_name in model_names:
@@ -454,10 +465,10 @@ def volume_occlusion(volume, res_tab,
         ## Get cutoff, invert heatmap if necessary and normalize
         cut_off = res_tab["y_pred_model_" + model_name[-4:-3]][0]
     
-        if (res_tab["y_pred_class"][0] == 0 and invert_hm == "pred_class" and not both_directions) or (
+        if (res_tab[y_pred_class][0] == 0 and invert_hm == "pred_class" and not both_directions) or (
             invert_hm == "never" and not both_directions): 
             hm[hm < cut_off] = cut_off
-        elif (res_tab["y_pred_class"][0] == 1 and invert_hm == "pred_class" and not both_directions) or (
+        elif (res_tab[y_pred_class][0] == 1 and invert_hm == "pred_class" and not both_directions) or (
             invert_hm == "always" and not both_directions):
             hm[hm > cut_off] = cut_off
         elif both_directions:
@@ -481,6 +492,8 @@ def volume_occlusion(volume, res_tab,
         heatmap = np.median(h_l, axis = 0)
     elif model_mode == "max":
         heatmap = np.max(h_l, axis = 0)
+    elif model_mode == "weighted":
+        heatmap = np.average(h_l, axis=0, weights=weights)
         
     if normalize and not both_directions:
         heatmap = ((heatmap - heatmap.min())/(heatmap.max()-heatmap.min()))
@@ -489,7 +502,7 @@ def volume_occlusion(volume, res_tab,
         heatmap_abs_max = np.max(np.abs(heatmap_min_max))
         heatmap = heatmap / heatmap_abs_max
         
-    if invert_hm == "pred_class" and res_tab["y_pred_class"][0] == 1:
+    if invert_hm == "pred_class" and res_tab[y_pred_class][0] == 1:
         heatmap = 1 - heatmap  
     elif invert_hm == "always":
         heatmap = 1 - heatmap
@@ -654,7 +667,7 @@ def volume_occlusion_tabular(volume, res_tab, tabular_df,
     # input_shape: tuple, shape of input volume
     
     ## Check input
-    valid_modes = ["mean", "median", "max"]
+    valid_modes = ["mean", "median", "max", "weighted"]
     if model_mode not in valid_modes:
         raise ValueError("volume_occlusion: model_mode must be one of %r." % valid_modes)
     
@@ -671,27 +684,39 @@ def volume_occlusion_tabular(volume, res_tab, tabular_df,
         occlusion_size = np.array([occlusion_size, occlusion_size, occlusion_size])
     elif len(occlusion_size) != 3:
         raise ValueError('occluson_size must be a scalar or a 3 element array')
-
+  
     if occlusion_stride is None:
-        occlusion_stride = np.min(occlusion_size)
-    elif any(occlusion_stride > occlusion_size):
+        occlusion_stride = np.repeat(np.min(occlusion_size),3)
+    elif len(occlusion_stride) == 1:
+        occlusion_stride = np.repeat(occlusion_stride,3)
+       
+  
+    if np.any(occlusion_stride > occlusion_size):
         raise ValueError('stride must be smaller or equal size')
     
-    if any(occlusion_stride == occlusion_size):
+    if np.any(occlusion_stride == occlusion_size):
         if (not (volume.shape[0] / occlusion_size)[0].is_integer() or
             not (volume.shape[1] / occlusion_size)[1].is_integer() or 
             not (volume.shape[2] / occlusion_size)[2].is_integer()):
             
             raise ValueError('size does not work with this volume')
-    elif any(occlusion_stride != occlusion_size):
-        if (((volume.shape[0]-occlusion_size[0]) % occlusion_stride) != 0 or 
-            ((volume.shape[1]-occlusion_size[1]) % occlusion_stride) != 0 or
-            ((volume.shape[2]-occlusion_size[2]) % occlusion_stride) != 0):
+    elif np.any(occlusion_stride != occlusion_size):
+        if (((volume.shape[0]-occlusion_size[0]) % occlusion_stride[0]) != 0 or 
+            ((volume.shape[1]-occlusion_size[1]) % occlusion_stride[1]) != 0 or
+            ((volume.shape[2]-occlusion_size[2]) % occlusion_stride[2]) != 0):
         
             raise ValueError('shape and size do not match')
     
+    y_pred_class = "y_pred_class_avg"
+    if model_mode == "weighted":
+        weights = res_tab.loc[:, res_tab.columns.str.startswith("weight")].to_numpy().squeeze()
+        y_pred_class += "_w"
+        model_names = model_names[weights>0]
+        weights = weights[weights>0] 
+
     ## loop over models
     h_l = []
+
     for model_name in model_names:
         input_dim = (128, 128, 28, 1)
         output_dim = 1
@@ -721,7 +746,6 @@ def volume_occlusion_tabular(volume, res_tab, tabular_df,
         
         X = np.array(X)
 
-
         filtered_df = tabular_df[tabular_df['patient_id'] == res_tab['p_id'][0]].drop('patient_id', axis=1).values
         X_tab_occ = np.tile(filtered_df, (len(X), 1))
 
@@ -729,15 +753,6 @@ def volume_occlusion_tabular(volume, res_tab, tabular_df,
         preds = cnn.predict(occ_dataset_pred)
         out = 1-sigmoid(preds[:,0]-preds[:,1])
                 
-        #occ_data = tf.data.Dataset.from_tensor_slices((X, X_tab_occ))
-        #occ_labels = tf.data.Dataset.from_tensor_slices((to_categorical(res_tab['unfavorable'].iloc[0].repeat(len(X)), num_classes = 2)))
-        #occ_loader = tf.data.Dataset.zip((occ_data, occ_labels))
-        #occ_dataset_pred = (occ_loader.batch(len(X)))       
-        #out = predict_ontram(cnn, data = occ_dataset_pred)['pdf'][:,1]
-
-        #out = 1-sigmoid(cnn.predict((X, X_tab_occ)))
-        #out = out.squeeze()       
-
         ## Add predictions to heatmap and count number of predictions per voxel
         for i in range(len(xyz)):
             x,y,z = xyz[i]
@@ -748,13 +763,15 @@ def volume_occlusion_tabular(volume, res_tab, tabular_df,
         
         ## Get cutoff, invert heatmap if necessary and normalize
         cut_off = res_tab["y_pred_model_" + model_name[-4:-3]][0]
-    
-        if (res_tab["y_pred_class"][0] == 0 and invert_hm == "pred_class" and not both_directions) or (
+                   
+        if (res_tab[y_pred_class][0] == 0 and invert_hm == "pred_class" and not both_directions) or (
             invert_hm == "never" and not both_directions): 
             hm[hm < cut_off] = cut_off
-        elif (res_tab["y_pred_class"][0] == 1 and invert_hm == "pred_class" and not both_directions) or (
+        elif (res_tab[y_pred_class][0] == 1 and invert_hm == "pred_class" and not both_directions) or (
             invert_hm == "always" and not both_directions):
             hm[hm > cut_off] = cut_off
+              
+        
         elif both_directions:
             hm = hm - cut_off
         
@@ -776,6 +793,10 @@ def volume_occlusion_tabular(volume, res_tab, tabular_df,
         heatmap = np.median(h_l, axis = 0)
     elif model_mode == "max":
         heatmap = np.max(h_l, axis = 0)
+
+    elif model_mode == "weighted":
+        heatmap = np.average(h_l, axis=0, weights=weights)
+
         
     if normalize and not both_directions:
         heatmap = ((heatmap - heatmap.min())/(heatmap.max()-heatmap.min()))
@@ -784,7 +805,7 @@ def volume_occlusion_tabular(volume, res_tab, tabular_df,
         heatmap_abs_max = np.max(np.abs(heatmap_min_max))
         heatmap = heatmap / heatmap_abs_max
         
-    if invert_hm == "pred_class" and res_tab["y_pred_class"][0] == 1:
+    if invert_hm == "pred_class" and res_tab[y_pred_class][0] == 1:
         heatmap = 1 - heatmap  
     elif invert_hm == "always":
         heatmap = 1 - heatmap
