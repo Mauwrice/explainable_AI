@@ -517,6 +517,7 @@ def occlusion_interactive_plot(p_id, occ_size, occ_stride,
                                generate_model_name, num_models,
                                pat_dat,
                                pred_hm_only=True,
+                               y_pred_cl = "y_pred_class",
                                heatmaps = None):
     # p_id: patient id
     # occ_size: size of the occlusion window
@@ -530,6 +531,7 @@ def occlusion_interactive_plot(p_id, occ_size, occ_stride,
     # pat_dat: the patient data table
     # pred_hm_only: if True then the heatmap is only plotted for the predicted class
     #               if False then the positive and negative heatmap is plotted
+    # y_pred_cl: the column name of the predicted class
     # heatmaps: if None then the heatmaps are generated, otherwise the heatmaps must be provided (same order as X_in)
     
     p_ids = [p_id]
@@ -542,7 +544,7 @@ def occlusion_interactive_plot(p_id, occ_size, occ_stride,
     print("age: ", pat_dat[pat_dat["p_id"] == res_table.p_id[0]]["age"].values[0])
     print("true mrs: ", res_table.mrs[0])
     print("true class: ", res_table.unfavorable[0])
-    print(colored("pred class: "+str(res_table.y_pred_class[0]), 
+    print(colored("pred class: "+str(res_table[y_pred_cl][0]), 
                 'green' if res_table["pred_correct"][0] == True else 'red'))
     print("pred prob (class 1): ", res_table.y_pred_trafo_avg[0])
     print("Threshold: ", res_table.threshold[0])

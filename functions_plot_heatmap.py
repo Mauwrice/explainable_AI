@@ -177,7 +177,8 @@ def plot_heatmap(resized_img, heatmap,
 # gradcam heatmap is calculated during function call
 # can be used for multiple patients
 def plot_gradcams_last_avg_org(res_table, vis_layers, res_images, res_model_names, model_3d,
-                               layer_mode, heatmap_mode, save_path, save_name, save = True, hm_of_pred = True):
+                               layer_mode, heatmap_mode, save_path, save_name, 
+                               save = True, hm_of_pred = True, y_pred_cl = "y_pred_class_avg"):
     # res_table: table with results
     # vis_layers: list of all layers to visualize 
     # res_images: list of all images to visualize (same order as res_table)
@@ -189,7 +190,8 @@ def plot_gradcams_last_avg_org(res_table, vis_layers, res_images, res_model_name
     # save_path: path to save the plots
     # save_name: name of the plot
     # save: if True the plot will be saved
-    # hm_of_pred: if True, the heatmap will be calculated for the predicted class.    
+    # hm_of_pred: if True, the heatmap will be calculated for the predicted class.  
+    # y_pred_cl: the column name of the predicted class  
     
     if "sigmoid" in str(model_3d.layers[-1].activation):
         pred_idx = 0
@@ -220,7 +222,7 @@ def plot_gradcams_last_avg_org(res_table, vis_layers, res_images, res_model_name
         plt.gcf().text(0.14, end_text+3/num_rows/18, "p_id:        " + str(round(res_table["p_id"][j])), fontsize=16)
         plt.gcf().text(0.14, end_text+2/num_rows/18, "true_mrs:    " + str(round(res_table["mrs"][j])), fontsize=16)
         plt.gcf().text(0.14, end_text+1/num_rows/18, "true class:  " + str(res_table["unfavorable"][j]), fontsize=16)
-        plt.gcf().text(0.4, end_text+3/num_rows/18, "pred class:          " + str(res_table["y_pred_class"][j]), fontsize=16,
+        plt.gcf().text(0.4, end_text+3/num_rows/18, "pred class:          " + str(res_table[y_pred_cl][j]), fontsize=16,
                       fontweight = "bold", color = ("red" if res_table["pred_correct"][j] == False else "black"))
         plt.gcf().text(0.4, end_text+2/num_rows/18, "pred prob (class 1): " + str(round(res_table["y_pred_trafo_avg"][j], 3)), fontsize=16)
         plt.gcf().text(0.4, end_text+1/num_rows/18, "pred uncertainty:    " + str(round(res_table["y_pred_unc"][j], 3)), fontsize=16)
@@ -231,7 +233,7 @@ def plot_gradcams_last_avg_org(res_table, vis_layers, res_images, res_model_name
                            "heatmap unc. last layer: " + str(round(res_table["heatmap_unc_last_layer"][j], 3)), fontsize=16)
         
         # check predicted class
-        if res_table["y_pred_class"][j] == 0 and hm_of_pred == True:
+        if res_table[y_pred_cl][j] == 0 and hm_of_pred == True:
             invert_last_layer = "last"
         else:
             invert_last_layer = "none"
@@ -298,7 +300,8 @@ def plot_gradcams_last_avg_org(res_table, vis_layers, res_images, res_model_name
 # can be used for multiple patients
 def plot_heatmaps_avg_max_org(pat_data, res_table, res_images, heatmaps,
                                cmap, hm_positive,
-                               save_path, save_name, save = True, hm_of_pred = True):
+                               save_path, save_name, save = True, hm_of_pred = True,
+                               y_pred_cl = "y_pred_class_avg"):
     # pat_data: table with patient data
     # res_table: table with results for all patients for which heatmaps should be plotted
     # res_images: list of all images to visualize (same order as res_table)
@@ -310,6 +313,7 @@ def plot_heatmaps_avg_max_org(pat_data, res_table, res_images, heatmaps,
     # save_name: name of the plot
     # save: if True the plot will be saved
     # hm_of_pred: if True, the heatmap will be calculated for the predicted class
+    # y_pred_cl: the column name of the predicted class
     
     # if "sigmoid" in str(model_3d.layers[-1].activation):
     #     pred_idx = 0
@@ -342,7 +346,7 @@ def plot_heatmaps_avg_max_org(pat_data, res_table, res_images, heatmaps,
         plt.gcf().text(0.14, end_text+1/num_rows/18, "age: " + str(
             pat_data.age[pat_data["p_id"] == res_table["p_id"][j]].values[0]), fontsize=16)
         plt.gcf().text(0.4, end_text+3/num_rows/18, "true class: " + str(res_table["unfavorable"][j]), fontsize=16)
-        plt.gcf().text(0.4, end_text+2/num_rows/18, "pred class: " + str(res_table["y_pred_class"][j]), fontsize=16,
+        plt.gcf().text(0.4, end_text+2/num_rows/18, "pred class: " + str(res_table[y_pred_cl][j]), fontsize=16,
                       fontweight = "bold", color = ("red" if res_table["pred_correct"][j] == False else "black"))
         plt.gcf().text(0.4, end_text+1/num_rows/18, "pred prob (class 1): " + str(round(res_table["y_pred_trafo_avg"][j], 3)), fontsize=16)
         plt.gcf().text(0.66, end_text+3/num_rows/18, "pred uncertainty: " + str(round(res_table["y_pred_unc"][j], 3)), fontsize=16)
@@ -351,7 +355,7 @@ def plot_heatmaps_avg_max_org(pat_data, res_table, res_images, heatmaps,
                            "heatmap uncertainty: " + str(round(res_table["heatmap_unc_last_layer"][j], 3)), fontsize=16)
         
         # check predicted class
-        if res_table["y_pred_class"][j] == 0 and hm_of_pred == True:
+        if res_table[y_pred_cl][j] == 0 and hm_of_pred == True:
             invert_last_layer = "last"
         else:
             invert_last_layer = "none"

@@ -229,7 +229,7 @@ def multi_models_grad_cam_3d(img, cnn, model_names, layers,
                                              h_l.reshape(target_shape).shape[1:])).transpose()
     hm_mean_std = np.sqrt(np.mean(np.var(h_l, axis = 0)))
         
-    return heatmap, resized_img, max_hm_slice, hm_mean_std
+    return heatmap, resized_img, max_hm_slice, hm_mean_std, h_l
 
 
 # Prepares data in order to use multi_models_grad_cam_3d and volume_occlusion
