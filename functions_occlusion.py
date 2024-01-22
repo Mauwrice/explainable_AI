@@ -13,13 +13,13 @@ import tensorflow as tf
 def iter_occlusion(volume, size, stride):
     # volume: np array in shape 128, 128, 64, 1
     # size: 3 element array or tuple
-    # stride: scalar
+    # stride: 3 element array or tuple
 
     occlusion_center = np.full((size[0], size[1], size[2], 1), [0.5], np.float32)
 
-    for x in range(0, volume.shape[0]-size[0]+1, stride):
-        for y in range(0, volume.shape[1]-size[1]+1, stride):
-            for z in range(0, volume.shape[2]-size[2]+1, stride):
+    for x in range(0, volume.shape[0]-size[0]+1, stride[0]):
+        for y in range(0, volume.shape[1]-size[1]+1, stride[1]):
+            for z in range(0, volume.shape[2]-size[2]+1, stride[2]):
                 tmp = volume.copy()
 
                 tmp[x:x + size[0], y:y + size[1], z:z + size[2]] = occlusion_center
