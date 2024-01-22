@@ -719,7 +719,6 @@ def volume_occlusion_tabular(volume, res_tab, tabular_df,
         
         X = np.array(X)
 
-
         filtered_df = tabular_df[tabular_df['patient_id'] == res_tab['p_id'][0]].drop('patient_id', axis=1).values
         X_tab_occ = np.tile(filtered_df, (len(X), 1))
 
