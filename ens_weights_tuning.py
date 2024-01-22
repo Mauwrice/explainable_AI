@@ -25,8 +25,6 @@ def get_w(intercepts, shift, X_tab, y_true, nens = 5):
         if not np.isfinite(ret):
             ret = 1e6  
         return ret
-
-    
     result = minimize(opt_fun, x0=np.full(nens, start), bounds=[(0, 1)] * nens, method='L-BFGS-B')
     w_optimized = result.x / np.sum(result.x)
 
