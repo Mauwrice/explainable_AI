@@ -202,3 +202,15 @@ def inverse_sigmoid(y):
 # for trafo averaging
 def sigmoid(x):
     return 1 / (1 + np.exp(-x))
+
+# weighted variance with axis argument
+# adjusted from https://stackoverflow.com/questions/2413522/weighted-standard-deviation-in-numpy
+def wght_variance(values, weights=None, axis=None):
+    """
+    Return the weighted standard deviation.
+    axis -- the axis for std calculation
+    values, weights -- Numpy ndarrays with the same shape on the according axis.
+    """
+    average = np.expand_dims(np.average(values, weights=weights, axis=axis), axis=axis)
+    variance = np.average((values-average)**2, weights=weights, axis=axis)
+    return variance
