@@ -70,11 +70,11 @@ def gradcam_interactive_plot(p_id, vis_layers,
         hm_positive=False
     
     if heatmaps is None:        
-        heatmap, resized_img, max_hm_slice, hm_mean_std = gc.multi_models_grad_cam_3d(
+        heatmap, resized_img, max_hm_slice, hm_mean_std, all_heatmaps = gc.multi_models_grad_cam_3d(
             img = np.expand_dims(res_images[0], axis = 0), 
             cnn = cnn,
             model_names = res_model_names[0],
-            layers = vis_layers[3],
+            layers = vis_layers,
             model_mode = "mean",
             pred_index = 0,
             invert_hm = invert_hm,
