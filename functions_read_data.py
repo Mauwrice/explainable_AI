@@ -182,7 +182,8 @@ def version_setup(DATA_DIR, version, model_version):
         path_results = DATA_DIR + "all_tab_results_andrea_split.csv" # andrea split
         
     elif version.startswith("10Fold"): ## for 10 Fold       
-        if version.endswith("V0") or version.endswith("sigmoid"):
+        if (version.endswith("V0") or version.endswith("sigmoid") or 
+            version.endswith("CIB") or version.endswith("CIB_LSX")):
             id_tab = pd.read_csv(DATA_DIR + "10Fold_ids_V0.csv", sep=",")
             num_models = 5
         elif version.endswith("V1"):
@@ -201,12 +202,12 @@ def version_setup(DATA_DIR, version, model_version):
         path_results = DATA_DIR + "all_tab_results_" + version + "_M" + str(model_version) + ".csv" # 10 Fold
         
     all_results = pd.read_csv(path_results, sep=",")
-    all_results = all_results.sort_values("p_idx")
+    all_results = all_results.sort_values("p_idx").reset_index(drop=True)
         
     return X_in, pat, id_tab, all_results, num_models
 
 # Returns directories for a given data and model version
-def dir_setup(DIR, version, model_version, hm_type = "gc", ending = "_predcl"):
+def dir_setup(DIR, version, model_version, weight_mode = "avg", hm_type = "gc", ending = "_predcl"):
     # DIR: working directory
     # version: which data to use (e.g. 10Fold_sigmoid_V1)
     # model_version: which model version to use
@@ -217,7 +218,7 @@ def dir_setup(DIR, version, model_version, hm_type = "gc", ending = "_predcl"):
         WEIGHT_DIR = DIR + "weights/" + version + "/"
         DATA_OUTPUT_DIR = DIR + "pictures/" + version + "/"
         PIC_OUTPUT_DIR = DIR + "pictures/" + version + "/"
-        pic_save_name = version + "_M" + str(model_version) + "_" + hm_type + ending
+        pic_save_name = version + "_M" + str(model_version) + "_" + weight_mode + "_" + hm_type + ending
         
     elif version == "andrea":
         WEIGHT_DIR = DIR + "weights/andrea_split/"

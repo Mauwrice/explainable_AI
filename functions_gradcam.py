@@ -3,9 +3,13 @@ import numpy as np
 
 from skimage.transform import resize
 
+import functions_metrics as fm
+
 ### GradCam for specific layer
 def grad_cam_3d(img, model_3d, layer, pred_index=None, 
                 inv_hm=False, gcplusplus=True):
+    # adapted from: https://keras.io/examples/vision/grad_cam/
+
     # img: 3d image
     # model_3d: 3d cnn model with loaded weights
     # layer: layer name of model_3d where gradcam should be applied
@@ -15,13 +19,23 @@ def grad_cam_3d(img, model_3d, layer, pred_index=None,
     
     # First, we create a MODEL that maps the input image to the activations
     # of the last conv layer as well as the output predictions
-    grad_model = tf.keras.models.Model([model_3d.inputs], [model_3d.get_layer(layer).output, model_3d.output])
+    # Match correct output layer of the CNN part (dependent on model architecture)
+    if model_3d.name == "cnn_3d_":
+        grad_model = tf.keras.models.Model([model_3d.inputs], 
+            [model_3d.get_layer(layer).output, model_3d.output])
+    elif model_3d.name == "mod_ontram":
+        grad_model = tf.keras.models.Model([model_3d.inputs], 
+            [model_3d.get_layer(layer).output, model_3d.get_layer("dense_complex_intercept").output])
     
     # Then, we compute the GRADIENT for our input image
     # with respect to the activations of the last conv layer
     with tf.GradientTape() as tape:
         conv_outputs, predictions = grad_model(img)
-        if pred_index is None or model_3d.layers[-1].get_config()["activation"] == "sigmoid":
+        # check for right model variant
+        if model_3d.name == "mod_ontram":
+            pred_index = 0
+            predictions = predictions * -1 # ontram predicts cumulative dist therfore invert
+        elif pred_index is None or model_3d.layers[-1].get_config().get("activation") == "sigmoid":
             pred_index = tf.argmax(predictions[0])
         class_channel = predictions[:, pred_index] # when sigmoid, pred_index must be None or 0
 
@@ -68,7 +82,6 @@ def grad_cam_3d(img, model_3d, layer, pred_index=None,
     resized_img = img.reshape(img.shape[1:])
     
     return heatmap, resized_img
-
 
 
 ### GradCam for multiple layers (mean, median or max of all layers can be used)
@@ -159,6 +172,7 @@ def multi_layers_grad_cam_3d(img, model_3d, layers, mode = "mean",
 def multi_models_grad_cam_3d(img, cnn, model_names, layers, 
                              model_mode = "mean", layer_mode = "mean", 
                              normalize = True, pred_index=None,
+                             model_weights=None,
                              invert_hm="none", gcpp_hm="last"):
     # img: 3d image
     # cnn: 3d cnn model without loaded weights
@@ -173,14 +187,21 @@ def multi_models_grad_cam_3d(img, cnn, model_names, layers,
     # gcpp_hm: one of "all", "none", "last", 
     #     if "all" then all heatmaps are positive, if "none" then all heatmaps are negative,
     #     if "last" then only last heatmap is positive (gradcam++)
-    
+
     ## Check input
-    valid_modes = ["mean", "median", "max"]
+    valid_modes = ["mean", "median", "max", "weighted"]
     if model_mode not in valid_modes:
         raise ValueError("multi_models_grad_cam_3d: model_mode must be one of %r." % valid_modes)
         
     if not isinstance(layers, list):
         layers = [layers]
+
+    if model_mode == "weighted" and model_weights is None:
+        raise ValueError("multi_models_grad_cam_3d: model_weights must be given when model_mode is weighted.")
+
+    if model_mode == "weighted":
+        model_names = list(np.array(model_names)[model_weights > 0])
+        weights = model_weights[model_weights>0] 
     
     ## Load weights and apply gradcam to all models
     h_l = []
@@ -198,7 +219,9 @@ def multi_models_grad_cam_3d(img, cnn, model_names, layers,
     elif model_mode == "median":
         heatmap = np.median(h_l, axis = 0)
     elif model_mode == "max":
-        heatmap = np.max(h_l, axis = 0)
+        heatmap = np.max(h_l, axis = 0) 
+    elif model_mode == "weighted":
+        heatmap = np.average(h_l, axis=0, weights=weights)
         
     ## Normalize heatmap
     if normalize and gcpp_hm in ["last", "all"] and heatmap.max() != 0:
@@ -215,9 +238,12 @@ def multi_models_grad_cam_3d(img, cnn, model_names, layers,
     target_shape = h_l.shape[:-1]
     max_hm_slice = np.array(np.unravel_index(h_l.reshape(target_shape).reshape(len(h_l), -1).argmax(axis = 1), 
                                              h_l.reshape(target_shape).shape[1:])).transpose()
-    hm_mean_std = np.sqrt(np.mean(np.var(h_l, axis = 0)))
+    if model_mode == "weighted":
+        hm_mean_std = np.sqrt(np.mean(fm.wght_variance(h_l, weights = weights, axis = 0)))
+    else:
+        hm_mean_std = np.sqrt(np.mean(np.var(h_l, axis = 0)))
         
-    return heatmap, resized_img, max_hm_slice, hm_mean_std
+    return heatmap, resized_img, max_hm_slice, hm_mean_std, h_l
 
 
 # Prepares data in order to use multi_models_grad_cam_3d and volume_occlusion

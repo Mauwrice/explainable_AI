@@ -27,6 +27,7 @@ from termcolor import colored
 import functions_occlusion as oc
 import functions_gradcam as gc
 import functions_plot_heatmap as phm
+import functions_metrics as fm
 
 import os 
 import pandas as pd
@@ -213,8 +214,9 @@ def img_model_linear_final(input_shape, output_shape, activation = "linear"):
     x = keras.layers.Dropout(0.3)(x)
     x = keras.layers.Dense(128, activation = 'relu')(x)
     x = keras.layers.Dropout(0.3)(x)
-    out_ = keras.layers.Dense(output_shape, activation = activation, use_bias = False)(x) 
-    nn_im = keras.Model(inputs = in_, outputs = out_)
+    out_ = keras.layers.Dense(output_shape, activation = activation, use_bias = False, 
+                              name = "dense_complex_intercept")(x) 
+    nn_im = keras.Model(inputs = in_, outputs = out_, name = "mod_complex_intercept")
     return nn_im
 
 
@@ -470,6 +472,7 @@ def volume_occlusion(volume, res_tab,
         elif (res_tab[y_pred_class][0] == 1 and invert_hm == "pred_class" and not both_directions) or (
             invert_hm == "always" and not both_directions):
             hm[hm > cut_off] = cut_off
+        # heatmap must be inverted later because else highest value has lowest impact
         elif both_directions:
             hm = hm - cut_off
         
@@ -501,18 +504,25 @@ def volume_occlusion(volume, res_tab,
         heatmap_abs_max = np.max(np.abs(heatmap_min_max))
         heatmap = heatmap / heatmap_abs_max
         
+    # invert at the end else inversion is done on unnormalized heatmap
     if invert_hm == "pred_class" and res_tab[y_pred_class][0] == 1:
         heatmap = 1 - heatmap  
     elif invert_hm == "always":
         heatmap = 1 - heatmap
+    elif both_directions: 
+        # inversion so interpretation is same as gradcam (positive heatmap => unfavorable, neg hm => favorable)
+        heatmap = heatmap * -1
         
     ## Get maximum heatmap slice and standard deviation of heatmaps
     target_shape = h_l.shape[:-1]
     max_hm_slice = np.array(np.unravel_index(h_l.reshape(target_shape).reshape(len(h_l), -1).argmax(axis = 1), 
                                              h_l.reshape(target_shape).shape[1:])).transpose()
-    hm_mean_std = np.sqrt(np.mean(np.var(h_l, axis = 0)))
+    if model_mode == "weighted":
+        hm_mean_std = np.sqrt(np.mean(fm.wght_variance(h_l, weights = weights, axis = 0)))
+    else:
+        hm_mean_std = np.sqrt(np.mean(np.var(h_l, axis = 0)))
     
-    return heatmap, volume, max_hm_slice, hm_mean_std
+    return heatmap, volume, max_hm_slice, hm_mean_std, h_l
 
 # generates a occlusion heatmap plot/slider for a given patient id
 # first row shows the average heatmap over each direction
@@ -529,6 +539,7 @@ def occlusion_interactive_plot(p_id, occ_size, occ_stride,
                                generate_model_name, num_models,
                                pat_dat,
                                pred_hm_only=True,
+                               y_pred_cl = "y_pred_class",
                                heatmaps = None):
     # p_id: patient id
     # occ_size: size of the occlusion window
@@ -542,6 +553,7 @@ def occlusion_interactive_plot(p_id, occ_size, occ_stride,
     # pat_dat: the patient data table
     # pred_hm_only: if True then the heatmap is only plotted for the predicted class
     #               if False then the positive and negative heatmap is plotted
+    # y_pred_cl: the column name of the predicted class
     # heatmaps: if None then the heatmaps are generated, otherwise the heatmaps must be provided (same order as X_in)
     
     p_ids = [p_id]
@@ -554,7 +566,7 @@ def occlusion_interactive_plot(p_id, occ_size, occ_stride,
     print("age: ", pat_dat[pat_dat["p_id"] == res_table.p_id[0]]["age"].values[0])
     print("true mrs: ", res_table.mrs[0])
     print("true class: ", res_table.unfavorable[0])
-    print(colored("pred class: "+str(res_table.y_pred_class[0]), 
+    print(colored("pred class: "+str(res_table[y_pred_cl][0]), 
                 'green' if res_table["pred_correct"][0] == True else 'red'))
     print("pred prob (class 1): ", res_table.y_pred_trafo_avg[0])
     print("Threshold: ", res_table.threshold[0])
@@ -766,9 +778,8 @@ def volume_occlusion_tabular(volume, res_tab, tabular_df,
             hm[hm < cut_off] = cut_off
         elif (res_tab[y_pred_class][0] == 1 and invert_hm == "pred_class" and not both_directions) or (
             invert_hm == "always" and not both_directions):
-            hm[hm > cut_off] = cut_off
-              
-        
+            hm[hm > cut_off] = cut_off     
+        # heatmap must be inverted later because else highest value has lowest impact
         elif both_directions:
             hm = hm - cut_off
         
@@ -790,7 +801,6 @@ def volume_occlusion_tabular(volume, res_tab, tabular_df,
         heatmap = np.median(h_l, axis = 0)
     elif model_mode == "max":
         heatmap = np.max(h_l, axis = 0)
-
     elif model_mode == "weighted":
         heatmap = np.average(h_l, axis=0, weights=weights)
 
@@ -802,15 +812,22 @@ def volume_occlusion_tabular(volume, res_tab, tabular_df,
         heatmap_abs_max = np.max(np.abs(heatmap_min_max))
         heatmap = heatmap / heatmap_abs_max
         
+    # invert at the end else inversion is done on unnormalized heatmap
     if invert_hm == "pred_class" and res_tab[y_pred_class][0] == 1:
         heatmap = 1 - heatmap  
     elif invert_hm == "always":
         heatmap = 1 - heatmap
+    elif both_directions: 
+        # inversion so interpretation is same as gradcam (positive heatmap => unfavorable, neg hm => favorable)
+        heatmap = heatmap * -1
         
     ## Get maximum heatmap slice and standard deviation of heatmaps
     target_shape = h_l.shape[:-1]
     max_hm_slice = np.array(np.unravel_index(h_l.reshape(target_shape).reshape(len(h_l), -1).argmax(axis = 1), 
                                              h_l.reshape(target_shape).shape[1:])).transpose()
-    hm_mean_std = np.sqrt(np.mean(np.var(h_l, axis = 0)))
+    if model_mode == "weighted":
+        hm_mean_std = np.sqrt(np.mean(fm.wght_variance(h_l, weights = weights, axis = 0)))
+    else:
+        hm_mean_std = np.sqrt(np.mean(np.var(h_l, axis = 0)))
     
-    return heatmap, volume, max_hm_slice, hm_mean_std
+    return heatmap, volume, max_hm_slice, hm_mean_std, h_l

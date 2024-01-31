@@ -140,7 +140,8 @@ def volume_occlusion(volume, res_tab,
             hm[hm < cut_off] = cut_off
         elif (res_tab["y_pred_class"][0] == 1 and invert_hm == "pred_class" and not both_directions) or (
             invert_hm == "always" and not both_directions):
-            hm[hm > cut_off] = cut_off
+            hm[hm > cut_off] = cut_off 
+        # heatmap must be inverted later because else highest value has lowest impact
         elif both_directions:
             hm = hm - cut_off
         
@@ -170,10 +171,14 @@ def volume_occlusion(volume, res_tab,
         heatmap_abs_max = np.max(np.abs(heatmap_min_max))
         heatmap = heatmap / heatmap_abs_max
         
+    # invert at the end else inversion is done on unnormalized heatmap
     if invert_hm == "pred_class" and res_tab["y_pred_class"][0] == 1:
         heatmap = 1 - heatmap  
     elif invert_hm == "always":
         heatmap = 1 - heatmap
+    elif both_directions: 
+        # inversion so interpretation is same as gradcam (positive heatmap => unfavorable, neg hm => favorable)
+        heatmap = heatmap * -1
         
     ## Get maximum heatmap slice and standard deviation of heatmaps
     target_shape = h_l.shape[:-1]
@@ -181,5 +186,5 @@ def volume_occlusion(volume, res_tab,
                                              h_l.reshape(target_shape).shape[1:])).transpose()
     hm_mean_std = np.sqrt(np.mean(np.var(h_l, axis = 0)))
     
-    return heatmap, volume, max_hm_slice, hm_mean_std
+    return heatmap, volume, max_hm_slice, hm_mean_std, h_l
 
