@@ -171,3 +171,9 @@ cython_debug/
 
 # vs code workspace
 *.code-workspace
+
+# numpy files
+.npy
+
+# logs folder
+logs/
