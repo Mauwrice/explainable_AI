@@ -708,7 +708,7 @@ def volume_occlusion_tabular(volume, res_tab, tabular_df,
     if model_mode == "weighted":
         weights = res_tab.loc[:, res_tab.columns.str.startswith("weight")].to_numpy().squeeze()
         y_pred_class += "_w"
-        model_names = model_names[weights>0]
+        model_names = list(np.array(model_names)[weights > 0])
         weights = weights[weights>0] 
 
     ## loop over models
