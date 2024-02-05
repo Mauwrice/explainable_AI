@@ -12,6 +12,7 @@ classification_models_3D/
 *.h5
 core
 *.png
+*.npy
 
 # Standard ignore for python projects ------------------------------------------
 
@@ -171,3 +172,7 @@ cython_debug/
 
 # vs code workspace
 *.code-workspace
+
+# logs folder
+logs/
+runs/
