@@ -7,7 +7,7 @@ import functions_metrics as fm
 
 ### GradCam for specific layer
 def grad_cam_3d(img, model_3d, layer, pred_index=None, 
-                inv_hm=False, gcplusplus=True):
+                inv_hm=False, gcplusplus=True, normalize = True):
     # adapted from: https://keras.io/examples/vision/grad_cam/
 
     # img: 3d image
@@ -16,6 +16,7 @@ def grad_cam_3d(img, model_3d, layer, pred_index=None,
     # pred_index: output channel when sigmoid should always be 0, when softmax 0 favorable, 1 unfavorable
     # inv_hm: invert heatmap
     # gcplusplus: use gradcam++ instead of gradcam (only positive values)
+    # normalize: normalize between 0 and 1 or -1 and 1 respectively (see gcplusplus)
     
     # First, we create a MODEL that maps the input image to the activations
     # of the last conv layer as well as the output predictions
@@ -71,15 +72,24 @@ def grad_cam_3d(img, model_3d, layer, pred_index=None,
     if inv_hm:
         heatmap = heatmap * (-1)
     
-    if gcplusplus:
-        heatmap = tf.maximum(heatmap, 0) / tf.math.reduce_max(heatmap)
+    if normalize:
+        if gcplusplus: #relu (max to 1)
+            heatmap = tf.maximum(heatmap, 0) / tf.math.reduce_max(heatmap)
+        else:
+            # normalize heatmap between -1 and 1 (absolute max is then -1 or 1)
+            heatmap_min_max = [tf.math.reduce_min(heatmap), tf.math.reduce_max(heatmap)]
+            heatmap_abs_max = tf.math.reduce_max(tf.math.abs(heatmap_min_max))
+            heatmap = heatmap / heatmap_abs_max
+        heatmap = heatmap.numpy()
     else:
-        # normalize heatmap between -1 and 1 (absolute max is then -1 or 1)
-        heatmap_min_max = [tf.math.reduce_min(heatmap), tf.math.reduce_max(heatmap)]
-        heatmap_abs_max = tf.math.reduce_max(tf.math.abs(heatmap_min_max))
-        heatmap = heatmap / heatmap_abs_max
-    heatmap = heatmap.numpy()
+        if gcplusplus: # true relu
+            heatmap = tf.maximum(heatmap, 0)
+            heatmap = heatmap.numpy()
+        # else: heatmap is already numpy because of resize
+    
     resized_img = img.reshape(img.shape[1:])
+
+    print(heatmap.min(), heatmap.max())
     
     return heatmap, resized_img
 
@@ -130,11 +140,11 @@ def multi_layers_grad_cam_3d(img, model_3d, layers, mode = "mean",
         if (i == len(layers)-1 and invert_hm == "last") or invert_hm == "all":
             heatmap, resized_img = grad_cam_3d(
                 img = img, model_3d = model_3d , layer = layer, 
-                pred_index=pred_index, inv_hm=True, gcplusplus=gcpp)
+                pred_index=pred_index, inv_hm=True, gcplusplus=gcpp, normalize=normalize)
         else:
             heatmap, resized_img = grad_cam_3d(
                 img = img, model_3d = model_3d , layer = layer, 
-                pred_index=pred_index, inv_hm=False, gcplusplus=gcpp)
+                pred_index=pred_index, inv_hm=False, gcplusplus=gcpp, normalize=normalize)
         h_l.append(heatmap)
         
     h_l = np.array(h_l)
@@ -160,8 +170,9 @@ def multi_layers_grad_cam_3d(img, model_3d, layers, mode = "mean",
         heatmap_abs_max = tf.math.reduce_max(tf.math.abs(heatmap_min_max))
         heatmap = heatmap / heatmap_abs_max
         heatmap = heatmap.numpy()
-    elif not normalize:
-        raise ValueError("Something went wrong with normalization in multi_layers_grad_cam_3d")
+    elif normalize:
+        heatmap = 0
+        raise Warning("Highest heatmap value is smaller or equal to 0 in multi_layers_grad_cam_3d")
     
     return (heatmap, resized_img)
 
@@ -178,7 +189,7 @@ def multi_models_grad_cam_3d(img, cnn, model_names, layers,
     # cnn: 3d cnn model without loaded weights
     # model_names: list of model names (with path) of cnn, to load weights
     # layers: list of layer names of model_3d where gradcam should be applied
-    # model_mode: mean, median or max, how to combine the heatmaps of the models
+    # model_mode: mean, median, max or weighted how to combine the heatmaps of the models
     # layer_mode: mean, median or max, how to combine the heatmaps of the layers
     # normalize: normalize heatmaps between 0 and 1
     # pred_index: output channel when sigmoid should always be 0, when softmax 0 favorable, 1 unfavorable
@@ -231,8 +242,9 @@ def multi_models_grad_cam_3d(img, cnn, model_names, layers,
         heatmap_abs_max = tf.math.reduce_max(tf.math.abs(heatmap_min_max))
         heatmap = heatmap / heatmap_abs_max
         heatmap = heatmap.numpy()
-    elif not normalize:
-        raise ValueError("Something went wrong with normalization in multi_models_grad_cam_3d")
+    elif normalize:
+        heatmap = 0
+        raise Warning("Highest heatmap value is smaller or equal to 0 in multi_models_grad_cam_3d")
         
     ## Extract max slice and mean std of heatmap
     target_shape = h_l.shape[:-1]

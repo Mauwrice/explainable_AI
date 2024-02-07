@@ -26,6 +26,8 @@ def gradcam_interactive_plot(p_id, vis_layers,
                              pat_dat,
                              pred_hm_only=True, 
                              y_pred_cl = "y_pred_class_avg",
+                             normalize_hm = True,
+                             model_mode = "mean",
                              heatmaps = None):
     # p_id: patient id
     # vis_layers: the layers for which the heatmap is generated, should be last layer
@@ -39,6 +41,8 @@ def gradcam_interactive_plot(p_id, vis_layers,
     # pred_hm_only: if True then the heatmap is only plotted for the predicted class
     #               if False then the positive and negative heatmap is plotted
     # y_pred_cl: the column name of the predicted class
+    # normalize_hm: if True then the heatmap is normalized
+    # model_mode: the mode for the model (mean, median, max or weighted)
     # heatmaps: if None then the heatmaps are generated, otherwise the heatmaps must be provided (same order as X_in)
     
     p_ids = [p_id]
@@ -47,15 +51,26 @@ def gradcam_interactive_plot(p_id, vis_layers,
         gen_model_name = generate_model_name,
         num_models = num_models)
     
+    if model_mode == "weigthed":
+        y_pred_cl = "y_pred_class_avg_w"
+        pred_co = "pred_correct_w"
+        y_pred_prob = "y_pred_trafo_avg_w"
+        y_pred_u = "y_pred_unc_w"
+    else:
+        y_pred_cl = "y_pred_class_avg"
+        pred_co = "pred_correct"
+        y_pred_prob = "y_pred_trafo_avg"
+        y_pred_u = "y_pred_unc"
+
+    
     print("patient id: ", res_table.p_id[0])
     print("age: ", pat_dat[pat_dat["p_id"] == res_table.p_id[0]]["age"].values[0])
     print("true mrs: ", res_table.mrs[0])
     print("true class: ", res_table.unfavorable[0])
     print(colored("pred class: "+str(res_table[y_pred_cl][0]), 
-                'green' if res_table["pred_correct"][0] == True else 'red'))
-    print("pred prob (class 1): ", res_table.y_pred_trafo_avg[0])
-    print("pred uncertainty: ", res_table.y_pred_unc[0])
-    # print("heatmap unc. last layer: ", res_table.y_pred_unc[0])
+                'green' if res_table[pred_co][0] == True else 'red'))
+    print("pred prob (class 1): ", res_table[y_pred_prob][0])
+    print("pred uncertainty: ", res_table[y_pred_u][0])
     
     ## Generate heatmap
     if pred_hm_only:
@@ -75,10 +90,14 @@ def gradcam_interactive_plot(p_id, vis_layers,
             cnn = cnn,
             model_names = res_model_names[0],
             layers = vis_layers,
-            model_mode = "mean",
+            model_mode = model_mode,
             pred_index = 0,
             invert_hm = invert_hm,
-            gcpp_hm = gcpp_hm)
+            gcpp_hm = gcpp_hm,
+            # model weigths are only used when model_mode = "weighted"
+            model_weights = res_table[0:1].reset_index(drop = True).loc[:, 
+                res_table.columns.str.startswith("weight")].to_numpy().squeeze(),
+            normalize = normalize_hm)
     else:
         heatmap = heatmaps[np.argwhere(pat == p_id).squeeze()]
         resized_img = res_images[0]
@@ -146,6 +165,9 @@ def occlusion_interactive_plot(p_id, occ_size, occ_stride,
                                pat_dat,
                                pred_hm_only=True,
                                y_pred_cl = "y_pred_class_avg",
+                               normalize_hm = True,
+                               model_mode = "mean",
+                               pat_norm_table = None,
                                heatmaps = None):
     # p_id: patient id
     # occ_size: size of the occlusion window
@@ -160,23 +182,37 @@ def occlusion_interactive_plot(p_id, occ_size, occ_stride,
     # pred_hm_only: if True then the heatmap is only plotted for the predicted class
     #               if False then the positive and negative heatmap is plotted
     # y_pred_cl: the column name of the predicted class
+    # normalize_hm: if True then the heatmap is normalized
+    # model_mode: the mode for the model (mean, median, max or weighted)
     # heatmaps: if None then the heatmaps are generated, otherwise the heatmaps must be provided (same order as X_in)
     
+    ####### redundant bc also in gradcam slicer => make function
     p_ids = [p_id]
     (res_table, res_images, res_model_names) = gc.get_img_and_models(
         p_ids, results = all_results, pats = pat, imgs = X_in, 
         gen_model_name = generate_model_name,
         num_models = num_models)
     
+    if model_mode == "weigthed":
+        y_pred_cl = "y_pred_class_avg_w"
+        pred_co = "pred_correct_w"
+        y_pred_prob = "y_pred_trafo_avg_w"
+        y_pred_u = "y_pred_unc_w"
+    else:
+        y_pred_cl = "y_pred_class_avg"
+        pred_co = "pred_correct"
+        y_pred_prob = "y_pred_trafo_avg"
+        y_pred_u = "y_pred_unc"
+
+    
     print("patient id: ", res_table.p_id[0])
     print("age: ", pat_dat[pat_dat["p_id"] == res_table.p_id[0]]["age"].values[0])
     print("true mrs: ", res_table.mrs[0])
     print("true class: ", res_table.unfavorable[0])
     print(colored("pred class: "+str(res_table[y_pred_cl][0]), 
-                'green' if res_table["pred_correct"][0] == True else 'red'))
-    print("pred prob (class 1): ", res_table.y_pred_trafo_avg[0])
-    print("pred uncertainty: ", res_table.y_pred_unc[0])
-    # print("heatmap unc. last layer: ", res_table.y_pred_unc[0])
+                'green' if res_table[pred_co][0] == True else 'red'))
+    print("pred prob (class 1): ", res_table[y_pred_prob][0])
+    print("pred uncertainty: ", res_table[y_pred_u][0])
       
     ## Generate heatmap
     if pred_hm_only:
@@ -189,16 +225,21 @@ def occlusion_interactive_plot(p_id, occ_size, occ_stride,
         both_directions = True
         cmap = "bwr"
         hm_positive=False   
+
+    ###### only this part is different to gradcam
     
     if heatmaps is None:
-        (heatmap, resized_img, max_hm_slice, hm_mean_std) =  oc.volume_occlusion(
+        (heatmap, resized_img, max_hm_slice, hm_mean_std, all_heatmaps) =  oc.volume_occlusion(
             volume = res_images, 
             res_tab = res_table, 
             occlusion_size = np.array(occ_size), 
             cnn = cnn,
             invert_hm=invert_hm,
+            tabular_df=pat_norm_table,
+            model_mode = model_mode,
             both_directions=both_directions,
             model_names = res_model_names[0],
+            normalize = normalize_hm,
             occlusion_stride = occ_stride)
     else:
         heatmap = heatmaps[np.argwhere(pat == p_id).squeeze()]
@@ -207,6 +248,8 @@ def occlusion_interactive_plot(p_id, occ_size, occ_stride,
     slices = np.unravel_index(heatmap.argmax(), heatmap.shape)
     print("max slices:", (slices[2], slices[0], slices[1]))
     
+
+    #### reduntant bc also in gradcam slicer => make function
     ## Plot Heatmap Average
     phm.plot_heatmap(resized_img, heatmap,
                 version = "overlay",
