@@ -156,15 +156,24 @@ def model_init(version,
 # Define the generate_model_name function based on model version, layer connection and last activation
 # Returns a function that generates a model name based on the split and model number
 def set_generate_model_name(model_version, layer_connection, last_activation, path):
+    ## ToDo: Naming convention should be adjusted globally
     def generate_model_name(which_split, model_nr):
         if last_activation == "linear" and "CIBLSX" in path:
-            return (path + "3d_cnn_binary_model_split" + "CIB_LSX" + str(which_split) + 
-                "_normalized_avg_layer_paper_model_" + last_activation + 
-                "_activation_"  + str(model_version) + "_" + str(model_nr) + ".h5")
+            if model_version == 1:
+                return (path + "3d_cnn_binary_model_split" + "CIB_LSX" + str(which_split) + 
+                    "_normalized_avg_layer_paper_model_" + last_activation + 
+                    "_activation_"  + str(model_version) + "_" + str(model_nr) + ".h5")
+            if model_version >= 2:
+                return (path + "3D_CNN_avg_layer_binary_outcome_CIBLSX_split" + str(which_split) +
+                    "_ens" + str(model_nr) + "_M" + str(model_version) + ".h5")
         elif last_activation == "linear" and "CIB" in path:
-            return (path + "3d_cnn_binary_model_split" + str(which_split) + 
-                "_unnormalized_avg_layer_paper_model_" + last_activation + 
-                "_activation_"  + str(model_version) + "_" + str(model_nr) + ".h5")  
+            if model_version == 1:
+                return (path + "3d_cnn_binary_model_split" + "CIB" + str(which_split) + 
+                    "_normalized_avg_layer_paper_model_" + last_activation + 
+                    "_activation_"  + str(model_version) + "_" + str(model_nr) + ".h5")
+            if model_version >= 2:
+                return (path + "3D_CNN_avg_layer_binary_outcome_CIB_split" + str(which_split) +
+                    "_ens" + str(model_nr) + "_M" + str(model_version) + ".h5")
         elif layer_connection == "globalAveragePooling":
             return (path + "3d_cnn_binary_model_split" + str(which_split) + 
                     "_unnormalized_avg_layer_paper_model_" + last_activation + 
@@ -173,7 +182,7 @@ def set_generate_model_name(model_version, layer_connection, last_activation, pa
             return (path + "3d_cnn_binary_model_split" + str(which_split) + 
                     "_unnormalized_flat_layer_paper_model_" + last_activation + 
                     "_activation_" + str(model_version) + str(model_nr) + ".h5")
-            
+
     return generate_model_name
 
 

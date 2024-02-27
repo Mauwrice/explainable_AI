@@ -233,7 +233,7 @@ def version_setup(DATA_DIR, version, model_version):
     all_results_tab = pd.read_csv(path_results, sep=",")
     all_results_tab = all_results_tab.sort_values("p_idx").reset_index(drop=True)
 
-    pat_orig_tab = pd.read_csv(DATA_DIR + "/baseline_data_zurich_prepared0.csv", sep=";")
+    pat_orig_tab = pd.read_csv(DATA_DIR + "/baseline_data_zurich_prepared0.csv", sep=";", decimal=",")
     pat_orig_tab = pat_orig_tab.sort_values("p_id").reset_index(drop=True)
     pat_orig_tab = pat_orig_tab[pat_orig_tab["p_id"].isin(pat)]
 
