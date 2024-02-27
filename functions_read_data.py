@@ -183,7 +183,7 @@ def split_data(id_tab, X, fold, X_tab = None):
 
 # Returns data for a given data and model version
 # if version == "andrea": returns data for andrea split
-def version_setup(DATA_DIR, version, model_version):
+def version_setup(DATA_DIR, version, model_version, compatibility_mode = False):
     # DATA_DIR: directory where data is stored
     # version: which data to use (e.g. 10Fold_sigmoid_V1)
     # model_version: which model version to use
@@ -196,44 +196,34 @@ def version_setup(DATA_DIR, version, model_version):
     #   pat_orig_tab: pandas dataframe, unnormalized tabular data of patients
     #   pat_norm_tab: pandas dataframe, normalized tabular data of patients (only when LSX)
     #   num_models: int, number of models
-    
-    if version == "andrea": ## for andrea
-        with h5py.File("/tf/notebooks/hezo/stroke_perfusion/data/dicom_2d_192x192x3_clean_interpolated_18_02_2021_preprocessed2.h5", "r") as h5:
-                       
-            # with h5py.File(IMG_DIR2 + 'dicom-3d.h5', "r") as h5:
-            # both images are the same
-                X_in = h5["X"][:]
-                pat = h5["pat"][:]
-                id_tab = None
-                num_models = 6
-                
-        # load results
-        path_results = DATA_DIR + "all_tab_results_andrea_split.csv" # andrea split
-        
-    elif version.startswith("10Fold"): ## for 10 Fold       
-        if (version.endswith("V0") or version.endswith("sigmoid") or 
-            version.endswith("CIB") or version.endswith("CIBLSX")):
-            id_tab = pd.read_csv(DATA_DIR + "10Fold_ids_V0.csv", sep=",")
-            num_models = 5
-        elif version.endswith("V1"):
-            id_tab = pd.read_csv(DATA_DIR + "10Fold_ids_V1.csv", sep=",")
-            num_models = 10
-        elif version.endswith("V2") or version.endswith("V2f"):
-            id_tab = pd.read_csv(DATA_DIR + "10Fold_ids_V2.csv", sep=",")
-            num_models = 5
-        elif version.endswith("V3"):
-            id_tab = pd.read_csv(DATA_DIR + "10Fold_ids_V3.csv", sep=",")
-            num_models = 5
-        pat = id_tab["p_id"].to_numpy()
-        X_in = np.load(DATA_DIR + "prepocessed_dicom_3d.npy")
-        
+    #   compatibility_mode: bool, if True, uses old naming convention
+
+    if (version.endswith("V0") or version.endswith("sigmoid") or 
+        version.endswith("CIB") or version.endswith("CIBLSX")):
+        id_tab = pd.read_csv(DATA_DIR + "10Fold_ids_V0.csv", sep=",")
+        num_models = 5
+    elif version.endswith("V1"):
+        id_tab = pd.read_csv(DATA_DIR + "10Fold_ids_V1.csv", sep=",")
+        num_models = 10
+    elif version.endswith("V2") or version.endswith("V2f"):
+        id_tab = pd.read_csv(DATA_DIR + "10Fold_ids_V2.csv", sep=",")
+        num_models = 5
+    elif version.endswith("V3"):
+        id_tab = pd.read_csv(DATA_DIR + "10Fold_ids_V3.csv", sep=",")
+        num_models = 5
+    pat = id_tab["p_id"].to_numpy()
+    X_in = np.load(DATA_DIR + "prepocessed_dicom_3d.npy")
+
+    if not compatibility_mode:
         # load results
         path_results = DATA_DIR + "all_tab_results_" + version + "_M" + str(model_version) + ".csv" # 10 Fold
+    elif compatibility_mode:
+        path_results = DATA_DIR + "all_tab_results_10Fold_" + version + "_M" + str(model_version) + ".csv"
         
     all_results_tab = pd.read_csv(path_results, sep=",")
     all_results_tab = all_results_tab.sort_values("p_idx").reset_index(drop=True)
 
-    pat_orig_tab = pd.read_csv(DATA_DIR + "/baseline_data_zurich_prepared0.csv", sep=";")
+    pat_orig_tab = pd.read_csv(DATA_DIR + "/baseline_data_zurich_prepared0.csv", sep=";", decimal=",")
     pat_orig_tab = pat_orig_tab.sort_values("p_id").reset_index(drop=True)
     pat_orig_tab = pat_orig_tab[pat_orig_tab["p_id"].isin(pat)]
 
