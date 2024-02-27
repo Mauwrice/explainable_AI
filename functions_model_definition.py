@@ -82,10 +82,9 @@ def stroke_binary_3d(input_dim = (128, 128, 28,1),
     return model_3d
 
 # Define the 3d cnn model parameters for binary stroke classification based on the current model version
-def model_setup(version, input_dim = (128, 128, 28, 1)):
+def model_setup(version, input_dim = (128, 128, 28, 1), ):
     # version: string, model version, e.g. 10Fold_sigmoid_V0
     # input_dim: tuple of integers, shape of input data
-    # C: integer, number of classes for Ontram
 
     if "sigmoid" in version or "andrea_split" in version:
         last_activation = "sigmoid"
@@ -178,4 +177,8 @@ def set_generate_model_name(model_version, layer_connection, last_activation, pa
     return generate_model_name
 
 
+def get_last_conv_layer(model):
+    vis_layers = [i.name for i in model.layers]
+    vis_layers = [vis_layer for vis_layer in vis_layers if vis_layer.startswith("conv")]
+    return vis_layers[-1]
 

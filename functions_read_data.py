@@ -137,10 +137,17 @@ def read_and_split_img_data_andrea(path_img, path_tab, path_splits, split, check
     return (X_train, X_valid, X_test), (y_train, y_valid, y_test), results
 
 # For 10 Fold data and a given fold: split data into training, validation and test set
-def split_data(id_tab, X, fold):
+def split_data(id_tab, X, fold, X_tab = None):
     # id_tab: table with patient ids and folds
     # X: image data
     # fold: which fold to use (0-9)
+    # X_tab: tabular data, if needed
+    #
+    # Returns a dictionary with the following keys:
+    # X, y, (and X_tab) each containing a dictionary with keys train, valid, test
+
+    # make sure id_tab is sorted
+    id_tab = id_tab.sort_values("p_id").reset_index(drop=True)
     
     # define indices of train, val, test
     train_idx_tab = id_tab[id_tab["fold" + str(fold)] == "train"]
@@ -158,8 +165,21 @@ def split_data(id_tab, X, fold):
     y_valid = id_tab["unfavorable"].to_numpy()[valid_idx_tab.index.to_numpy()]
     X_test = X[test_idx_tab.p_idx.to_numpy() - 1]
     y_test = id_tab["unfavorable"].to_numpy()[test_idx_tab.index.to_numpy()]
-    
-    return (X_train, X_valid, X_test), (y_train, y_valid, y_test)
+
+    data_dict = {"X" : {"train": X_train, "valid": X_valid, "test": X_test}, 
+                 "y" : {"train": y_train, "valid": y_valid, "test": y_test}}
+
+    if X_tab is not None:
+        X_tab = X_tab.sort_values("p_id").reset_index(drop=True)
+        X_tab = X_tab.drop(columns = ["p_id"])
+
+        X_train_tab = X_tab.iloc[train_idx_tab.p_idx.to_numpy() - 1,].to_numpy()
+        X_valid_tab = X_tab.iloc[valid_idx_tab.p_idx.to_numpy() - 1,].to_numpy()
+        X_test_tab = X_tab.iloc[test_idx_tab.p_idx.to_numpy() - 1,].to_numpy()
+
+        data_dict["X_tab"] = {"train": X_train_tab, "valid": X_valid_tab, "test": X_test_tab}
+        
+    return data_dict
 
 # Returns data for a given data and model version
 # if version == "andrea": returns data for andrea split
@@ -167,6 +187,15 @@ def version_setup(DATA_DIR, version, model_version):
     # DATA_DIR: directory where data is stored
     # version: which data to use (e.g. 10Fold_sigmoid_V1)
     # model_version: which model version to use
+
+    # Returns: 
+    #   X_in: 4D numpy array, 3d image data
+    #   pat: 1D numpy array, patient ids
+    #   id_tab: pandas dataframe, patient ids and folds
+    #   all_results_tab: pandas dataframe, results of all models
+    #   pat_orig_tab: pandas dataframe, unnormalized tabular data of patients
+    #   pat_norm_tab: pandas dataframe, normalized tabular data of patients (only when LSX)
+    #   num_models: int, number of models
     
     if version == "andrea": ## for andrea
         with h5py.File("/tf/notebooks/hezo/stroke_perfusion/data/dicom_2d_192x192x3_clean_interpolated_18_02_2021_preprocessed2.h5", "r") as h5:
@@ -183,7 +212,7 @@ def version_setup(DATA_DIR, version, model_version):
         
     elif version.startswith("10Fold"): ## for 10 Fold       
         if (version.endswith("V0") or version.endswith("sigmoid") or 
-            version.endswith("CIB") or version.endswith("CIB_LSX")):
+            version.endswith("CIB") or version.endswith("CIBLSX")):
             id_tab = pd.read_csv(DATA_DIR + "10Fold_ids_V0.csv", sep=",")
             num_models = 5
         elif version.endswith("V1"):
@@ -201,10 +230,25 @@ def version_setup(DATA_DIR, version, model_version):
         # load results
         path_results = DATA_DIR + "all_tab_results_" + version + "_M" + str(model_version) + ".csv" # 10 Fold
         
-    all_results = pd.read_csv(path_results, sep=",")
-    all_results = all_results.sort_values("p_idx").reset_index(drop=True)
+    all_results_tab = pd.read_csv(path_results, sep=",")
+    all_results_tab = all_results_tab.sort_values("p_idx").reset_index(drop=True)
+
+    pat_orig_tab = pd.read_csv(DATA_DIR + "/baseline_data_zurich_prepared0.csv", sep=";")
+    pat_orig_tab = pat_orig_tab.sort_values("p_id").reset_index(drop=True)
+    pat_orig_tab = pat_orig_tab[pat_orig_tab["p_id"].isin(pat)]
+
+    if "LSX" in version:
+        pat_norm_tab = pd.read_csv(DATA_DIR + "/baseline_data_zurich_prepared.csv", sep=",")
+        pat_norm_tab = pat_norm_tab.sort_values("p_id").reset_index(drop=True)
+        pat_norm_tab = pat_norm_tab[pat_norm_tab["p_id"].isin(pat)]
+        pat_norm_tab = pat_norm_tab[["p_id", "age", "sexm", "nihss_baseline", "mrs_before",
+                                     "stroke_beforey", "tia_beforey", "ich_beforey", 
+                                     "rf_hypertoniay", "rf_diabetesy", "rf_hypercholesterolemiay", 
+                                     "rf_smokery", "rf_atrial_fibrillationy", "rf_chdy"]]
+    else:
+        pat_norm_tab = None
         
-    return X_in, pat, id_tab, all_results, num_models
+    return X_in, pat, id_tab, all_results_tab, pat_orig_tab, pat_norm_tab, num_models
 
 # Returns directories for a given data and model version
 def dir_setup(DIR, version, model_version, 
@@ -357,19 +401,4 @@ def split_data_tabular_test():
 
 
 ####
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
