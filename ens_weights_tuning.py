@@ -30,7 +30,6 @@ def get_w(intercepts, shift, X_tab, y_true, nens = 5):
 
     return w_optimized
 
-
 def get_ensemble_CIB(intercepts,weights=None, n_ens=5):
     if weights is None:
         weights = np.ones(n_ens) / n_ens
@@ -55,3 +54,45 @@ def get_w_CIB(intercepts, y_true, nens = 5):
     w_optimized = result.x / np.sum(result.x)
 
     return w_optimized
+
+
+
+#------------------------------------------------------------------------------------------------------------------------------------------------------
+
+def get_ensemble_CIB(intercepts,weights=None, n_ens=5, shift = None):
+    if weights is None:
+        weights = np.ones(n_ens) / n_ens
+
+    weighted_intercepts = np.average(np.array(intercepts), axis=0, weights=weights)
+
+    if version == "CIB":
+        return (1-utils.sigmoid(weighted_intercepts)) 
+    
+    else:
+        weighted_shifts = np.average(np.array(shift), axis=0, weights=weights)
+        linprod = np.dot(X_tab, weighted_shifts)
+        return (1-utils.sigmoid(weighted_intercepts))    
+
+
+
+   
+
+
+def get_ensemble(intercepts, shift, X_tab, weights=None, n_ens=5):
+    if weights is None:
+        weights = np.ones(n_ens) / n_ens
+    weighted_intercepts = np.average(np.array(intercepts), axis=0, weights=weights)
+    weighted_shifts = np.average(np.array(shift), axis=0, weights=weights)
+    linprod = np.dot(X_tab, weighted_shifts)
+    return (1-utils.sigmoid(weighted_intercepts - linprod.flatten()))    
+
+
+def get_ensemble_CIB(intercepts,weights=None, n_ens=5):
+    if weights is None:
+        weights = np.ones(n_ens) / n_ens
+    weighted_intercepts = np.average(np.array(intercepts), axis=0, weights=weights)
+    return (1-utils.sigmoid(weighted_intercepts))    
+
+
+
+

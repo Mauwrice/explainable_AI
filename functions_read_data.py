@@ -207,26 +207,45 @@ def version_setup(DATA_DIR, version, model_version):
     return X_in, pat, id_tab, all_results, num_models
 
 # Returns directories for a given data and model version
-def dir_setup(DIR, version, model_version, weight_mode = "avg", hm_type = "gc", ending = "_predcl"):
+def dir_setup(DIR, version, model_version, 
+              weight_mode = "avg", 
+              hm_type = "gc", 
+              pred_hm = True, 
+              hm_norm = False,
+              compatibility_mode = False):
+    
     # DIR: working directory
     # version: which data to use (e.g. 10Fold_sigmoid_V1)
     # model_version: which model version to use
     # hm_type: which heatmap type to use (gc (gradcam), oc (occlusion))
-    # ending: ending of picture name (e.g. _predcl (predicted class))   
+    # pred_hm: predicted-class (if True) or both classes
+    # hm_norm: heatmap normalization (= True) and False for un-normalized heatmaps
+    # compatibility_mode: if True: old_name convention, if False: new name convention
     
-    if version.startswith("10Fold"):
-        WEIGHT_DIR = DIR + "weights/" + version + "/"
-        DATA_OUTPUT_DIR = DIR + "pictures/" + version + "/"
-        PIC_OUTPUT_DIR = DIR + "pictures/" + version + "/"
-        pic_save_name = version + "_M" + str(model_version) + "_" + weight_mode + "_" + hm_type + ending
-        
-    elif version == "andrea":
-        WEIGHT_DIR = DIR + "weights/andrea_split/"
-        DATA_OUTPUT_DIR = DIR + "pictures/andrea_split/"
-        PIC_OUTPUT_DIR = DIR + "pictures/andrea_split/"
-        pic_save_name = "andrea_split_" + hm_type + ending
-        
-    return WEIGHT_DIR, DATA_OUTPUT_DIR, PIC_OUTPUT_DIR, pic_save_name
+    WEIGHT_DIR = DIR + "weights/10Fold_" + version + "/"
+    DATA_OUTPUT_DIR = DIR + "pictures/10Fold_" + version + "/"
+    PIC_OUTPUT_DIR = DIR + "pictures/10Fold_" + version + "/"
+
+    if not compatibility_mode:
+        save_name = version + "_" + "_M" + str(model_version)    
+    elif compatibility_mode:
+        save_name = "10Fold_" + version + "_M" + str(model_version)
+
+    if weight_mode is not None:
+        save_name = save_name + "_" + weight_mode
+
+    if hm_type is not None:
+        save_name = save_name + "_" + hm_type   
+
+    if pred_hm:
+        save_name = save_name + "_" + "predcl"
+    elif not pred_hm:
+        save_name = save_name + "_" + "bothcl" 
+
+    if hm_norm is not False:
+        save_name = save_name + "_" + "unnormalized"    
+       
+    return WEIGHT_DIR, DATA_OUTPUT_DIR, PIC_OUTPUT_DIR, save_name
 
 
 # def normalize(volume):
