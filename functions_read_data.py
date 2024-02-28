@@ -219,10 +219,13 @@ def version_setup(DATA_DIR, version, model_version, compatibility_mode = False):
         path_results = DATA_DIR + "all_tab_results_" + version + "_M" + str(model_version) + ".csv" # 10 Fold
     elif compatibility_mode:
         path_results = DATA_DIR + "all_tab_results_10Fold_" + version + "_M" + str(model_version) + ".csv"
-        
-    all_results_tab = pd.read_csv(path_results, sep=",")
-    all_results_tab = all_results_tab.sort_values("p_idx").reset_index(drop=True)
 
+    if os.path.exists(path_results):    
+        all_results_tab = pd.read_csv(path_results, sep=",")
+        all_results_tab = all_results_tab.sort_values("p_idx").reset_index(drop=True)
+    else: 
+        all_results_tab = None
+    
     pat_orig_tab = pd.read_csv(DATA_DIR + "/baseline_data_zurich_prepared0.csv", sep=";", decimal=",")
     pat_orig_tab = pat_orig_tab.sort_values("p_id").reset_index(drop=True)
     pat_orig_tab = pat_orig_tab[pat_orig_tab["p_id"].isin(pat)]
