@@ -241,14 +241,16 @@ def version_setup(DATA_DIR, version, model_version, compatibility_mode = False):
     return X_in, pat, id_tab, all_results_tab, pat_orig_tab, pat_norm_tab, num_models
 
 # Returns directories for a given data and model version
-def dir_setup(DIR, version, model_version, 
+def dir_setup(INPUTDIR, OUTPUTDIR, 
+              version, model_version, 
               weight_mode = "avg", 
               hm_type = "gc", 
               pred_hm = True, 
               hm_norm = False,
               compatibility_mode = False):
     
-    # DIR: working directory
+    # INPUTDIR: root directory for inputs (data, weights)
+    # OUTPUTDIR: root directory for outputs (working directory)
     # version: which data to use (e.g. 10Fold_sigmoid_V1)
     # model_version: which model version to use
     # hm_type: which heatmap type to use (gc (gradcam), oc (occlusion))
@@ -256,12 +258,13 @@ def dir_setup(DIR, version, model_version,
     # hm_norm: heatmap normalization (= True) and False for un-normalized heatmaps
     # compatibility_mode: if True: old_name convention, if False: new name convention
     
-    WEIGHT_DIR = DIR + "weights/10Fold_" + version + "/"
-    DATA_OUTPUT_DIR = DIR + "pictures/10Fold_" + version + "/"
-    PIC_OUTPUT_DIR = DIR + "pictures/10Fold_" + version + "/"
+    DATA_DIR = INPUTDIR + "data/"
+    WEIGHT_DIR = INPUTDIR + "weights/10Fold_" + version + "/"
+    DATA_OUTPUT_DIR = OUTPUTDIR  + "pictures/10Fold_" + version + "/"
+    PIC_OUTPUT_DIR = OUTPUTDIR  + "pictures/10Fold_" + version + "/"
 
     if not compatibility_mode:
-        save_name = version + "_" + "_M" + str(model_version)    
+        save_name = version + "_M" + str(model_version)    
     elif compatibility_mode:
         save_name = "10Fold_" + version + "_M" + str(model_version)
 
@@ -276,10 +279,12 @@ def dir_setup(DIR, version, model_version,
     elif not pred_hm:
         save_name = save_name + "_" + "bothcl" 
 
-    if hm_norm is not False:
+    if not hm_norm:
         save_name = save_name + "_" + "unnormalized"    
+    elif not compatibility_mode and hm_norm:
+        save_name = save_name + "_" + "normalized"
        
-    return WEIGHT_DIR, DATA_OUTPUT_DIR, PIC_OUTPUT_DIR, save_name
+    return DATA_DIR, WEIGHT_DIR, DATA_OUTPUT_DIR, PIC_OUTPUT_DIR, save_name
 
 
 # def normalize(volume):
