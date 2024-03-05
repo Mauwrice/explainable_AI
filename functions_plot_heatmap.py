@@ -26,7 +26,7 @@ def plot_heatmap(resized_img, heatmap,
                  add_plot = None,
                  return_fig = False,
                  show = True,
-                 add_orientation = False,
+                 add_orientation = True,
                  pic_size = (128,128)):
     # resized_img: 3D image (numpy array) of shape (x,y,z)
     # heatmap: 3D heatmap (numpy array) of shape (x,y,z)
@@ -41,7 +41,7 @@ def plot_heatmap(resized_img, heatmap,
     # heatmap_threshold: if not None, then should be between 0 and 1. At which proportion of the heatmap values, 
     #                     the heatmap should be set to 0. This can reduce noise of GradCam. "gradcam threshold"
     # negative: if True, the image will be inverted (negative)
-    # hm_positive: if True only positive Values will be shown (should be normal if gradcam++) 
+    # hm_positive: if True only positive Values will be shown
     #              if False, all values will be shown
     # hm_colormap: colormap of the heatmap
     # colorbar: if True a colorbar will be added to the plot
@@ -149,7 +149,8 @@ def plot_heatmap(resized_img, heatmap,
                        color='r', linestyle='-')
         ax.set_title(captions[i])
         if add_orientation:
-            plt.text(1.5, 124, ["LO", "LB", "OB"][i], color="white", fontweight="bold", fontsize=12)#, bbox=dict(fill=False, edgecolor='red', linewidth=2))
+            plt.text(1.5, 124, ["LP", "LB", "PB"][i], color="white", fontweight="bold", fontsize=12)#, bbox=dict(fill=False, edgecolor='red', linewidth=2))
+            plt.text(116.5, 124, ["RP", "RB", "AB"][i], color="white", fontweight="bold", fontsize=12)
 
         plt.axis('off')
     
@@ -170,7 +171,7 @@ def plot_heatmap(resized_img, heatmap,
                 cmap=hm_colormap), 
             cax=axins,
             label='',
-            ticks=np.trunc(np.linspace(heatmaps_min, heatmaps_max, 5)*100)/100)
+            ticks=np.trunc(np.linspace(heatmaps_min, heatmaps_max, 5)*10000)/10000)
         
     if show:
         plt.show()
@@ -440,171 +441,6 @@ def plot_heatmaps_avg_max_org(pat_data, res_table, res_images, heatmaps,
                         ("testset_" + res_table["p_id"][j] + "_" if add_testset else "") +
                         save_name + '_last_layer_avg_max_orig.png')
 
-################################
-
-           
-
-
-def plot_heatmap2(resized_img, heatmap, 
-                 version = "overlay",
-                 mode = "avg",
-                 slices = None,
-                 orig_max = False,
-                 heatmap_threshold = None,
-                 negative = False,
-                 hm_positive = True,
-                 hm_colormap = "jet",
-                 colorbar = False,
-                 slice_line = False,
-                 add_plot = None,
-                 return_fig = False,
-                 show = True,
-                 pic_size = (128,128)):
-    # resized_img: 3D image (numpy array) of shape (x,y,z)
-    # heatmap: 3D heatmap (numpy array) of shape (x,y,z)
-    # version: overlay: heatmap is overlayed on image
-    #          original: only image is shown
-    #          activation: only heatmap is shown
-    # mode: avg => averages (mean) of heatmaps and image. avg_heatmap_correction can be applied for heatmap average
-    #       max => extracts slice with highest activation for heatmap and image
-    #       def => extracts defined slices. if not defined by "slices", than extract middle slice of each view
-    # slices: should be none or a tuple of shape 3. defines which slice to take when mode == "def" (cor, sag, ax)
-    # orig_max: if True and mode is "max" then the slice with the brightest point is selected
-    # heatmap_threshold: if not None, then should be between 0 and 1. At which proportion of the heatmap values, 
-    #                     the heatmap should be set to 0. This can reduce noise of GradCam. "gradcam threshold"
-    # negative: if True, the image will be inverted (negative)
-    # hm_positive: if True only positive Values will be shown (should be normal if gradcam++) 
-    #              if False, all values will be shown
-    # hm_colormap: colormap of the heatmap
-    # colorbar: if True a colorbar will be added to the plot
-    # slice_line: if True a line will be drawn in the image to show which slice is selected
-    # add_plot: if not NULL, a tuple of (current_row, total_rows) must be given (current_row starts counting with 0)
-    # return_fig: if True, the figure and axis will be returned
-    # show: if True, the plot will be shown
-    # pic_size: size of the image in the plot
-
-    if len(resized_img.shape) == 4 and resized_img.shape[-1] == 1:
-        # If grayscale with single channel, remove the last dimension
-        resized_img = resized_img.squeeze(axis=-1)    
-    
-    valid_versions = ["overlay", "original", "activation"]
-    valid_modes = ["avg", "max", "def"]
-    if version not in valid_versions:
-        raise ValueError("plot_heatmap: version must be one of %r." % valid_versions)
-    if mode not in valid_modes:
-        raise ValueError("plot_heatmap: mode must be one of %r." % valid_modes)
-    if heatmap_threshold is not None:
-        if not (heatmap_threshold < 1 and heatmap_threshold > 0):
-            raise ValueError("plot_heatmap: if heatmap_threshold is not None than must be between 0 and 1")
-    
-    if slices is None and mode == "def":
-        warnings.warn("plot_heatmap: slices are not defined but mode is set to def. Plot slices (64,64,14)")
-        slices = (64,64,14)
-    elif slices is not None and mode in ["avg", "max"]:
-        warnings.warn("plot_heatmap: slices are defined but mode is not set to def. Ignore value of slice!")
-
-    if mode == "max" and orig_max == False:
-        slices = np.unravel_index(heatmap.argmax(), heatmap.shape)
-    elif mode == "max" and orig_max == True:
-        slices = np.unravel_index(resized_img.argmax(), resized_img.shape)
-        
-    if negative:
-        resized_img = np.negative(resized_img)
-
-    if add_plot is None:
-        fig = plt.figure(figsize = (15,15))
-    
-    # Define all plots (image and heatmap even if not used)
-    # Also define captions
-    if mode == "avg":
-        img_ax = np.mean(resized_img, axis = 2)
-        map_ax = np.mean(heatmap, axis = 2)
-        img_cor = skimage.transform.resize(np.rot90(np.mean(resized_img, axis = 0)), output_shape=pic_size)
-        map_cor = skimage.transform.resize(np.rot90(np.mean(heatmap, axis = 0)), output_shape=pic_size)
-        img_sag = skimage.transform.resize(np.fliplr(np.rot90(np.mean(resized_img, axis = 1))), output_shape=pic_size)
-        map_sag = skimage.transform.resize(np.fliplr(np.rot90(np.mean(heatmap, axis = 1))), output_shape=pic_size)
-        captions = ["Axial Avg", "Coronal Avg", "Sagital Avg"]            
-    else:
-        img_ax = resized_img[:,:,slices[2]]
-        map_ax = heatmap[:,:,slices[2]]
-        img_cor = skimage.transform.resize(np.rot90(resized_img[slices[0],:,: ]), output_shape=pic_size)
-        map_cor = skimage.transform.resize(np.rot90(heatmap[slices[0],:,:]), output_shape=pic_size)
-        img_sag = skimage.transform.resize(np.fliplr(np.rot90(resized_img[:,slices[1],: ])), output_shape=pic_size)
-        map_sag = skimage.transform.resize(np.fliplr(np.rot90(heatmap[:,slices[1],:])), output_shape=pic_size)
-        captions = ["Ax. Slice: " + str(slices[2]), "Cor. Slice: " + str(slices[0]), "Sag. Slice: " + str(slices[1])]
-        
-    # apply heatmap_threshold if it is defined (GradCam threshold)
-    if heatmap_threshold is not None:
-        ax_th = np.max(map_ax)*heatmap_threshold
-        map_ax[map_ax < ax_th] = 0
-        cor_th = np.max(map_cor)*heatmap_threshold
-        map_cor[map_cor < cor_th] = 0
-        sag_th = np.max(map_sag)*heatmap_threshold
-        map_sag[map_sag < sag_th] = 0
-
-    images = [img_ax, img_cor, img_sag]
-    heatmaps = [map_ax, map_cor, map_sag]
-    
-    images_min = np.array(images).min()
-    images_max = np.array(images).max()
-    
-    if hm_positive:
-        heatmaps_min = np.array(heatmaps).min()
-        heatmaps_max = np.array(heatmaps).max()
-    else:
-        abs_max = np.abs(np.array(heatmaps)).max()
-        heatmaps_min = -abs_max
-        heatmaps_max = abs_max
-        
-    
-    # For all three views plot desired version and add caption
-    if slice_line and mode != "avg":
-        h_line = (0,2,2)
-        v_line = (1,1,0)
-        
-    for i in range(3):
-        if add_plot is None:
-            ax = plt.subplot(1,3, i+1)
-        elif len(add_plot) == 2:
-            ax = plt.subplot(add_plot[1], 3, (add_plot[0]*3)+(i+1))
-            
-        if version in ["overlay", "original"]:
-            ax.imshow(images[i], cmap='gray', vmin = images_min, vmax = images_max)
-        if version in ["overlay", "activation"]:
-            ax.imshow(heatmaps[i], alpha=0.4, cmap=hm_colormap, vmin = heatmaps_min, vmax = heatmaps_max)
-        if slice_line and mode != "avg":
-            ax.axhline(y=slices[h_line[i]] if i == 0 else
-                       heatmap.shape[0]-np.round(slices[h_line[i]]*heatmap.shape[0]/heatmap.shape[2]), 
-                       color='r', linestyle='-')
-            ax.axvline(x=slices[v_line[i]] if i != 2 else 
-                       heatmap.shape[1]-slices[v_line[i]], 
-                       color='r', linestyle='-')
-        ax.set_title(captions[i])
-        plt.axis('off')
-    
-    ## Add colorbar
-    if colorbar and version != "original":
-        axins = inset_axes(
-            ax,
-            width="5%",  # width: 5% of parent_bbox width
-            height="100%",  # height: 50%
-            loc="lower left",
-            bbox_to_anchor=(1.01, 0., 1, 1),
-            bbox_transform=ax.transAxes,
-            borderpad=0,
-        )
-        plt.colorbar(
-            matplotlib.cm.ScalarMappable(
-                norm=matplotlib.colors.Normalize(vmin=heatmaps_min, vmax=heatmaps_max, clip=False), 
-                cmap=hm_colormap), 
-            cax=axins,
-            label='',
-            ticks=np.trunc(np.linspace(heatmaps_min, heatmaps_max, 5)*100)/100)
-        
-    if show:
-        plt.show()
-    if return_fig:
-        return fig, ax
         
 
 
