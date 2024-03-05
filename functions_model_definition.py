@@ -1,10 +1,8 @@
 import tensorflow as tf
 from tensorflow import keras
-from tensorflow.keras import layers
-import tensorflow_probability as tfp
-from tensorflow.keras.models import Model
+from keras import layers
+from keras.models import Model
 
-import Utils_maurice as utils
 from k_ontram_functions.ontram import ontram
 from k_ontram_functions.ontram_loss import ontram_loss
 from k_ontram_functions.ontram_metrics import ontram_acc
@@ -81,6 +79,44 @@ def stroke_binary_3d(input_dim = (128, 128, 28,1),
     
     return model_3d
 
+# Model for linear shift terms
+def mod_linear_shift(x):
+    mod = keras.Sequential(name = "mod_linear_shift")
+    mod.add(keras.Input(shape = (x, )))
+    mod.add(keras.layers.Dense(1, activation = "linear", use_bias = False))
+    return mod
+
+# Model for complex intercept
+def img_model_linear_final(input_shape, output_shape, activation = "linear"):
+    initializer = keras.initializers.he_normal(seed = 2202)
+    in_ = keras.Input(shape = input_shape)
+
+    # conv block 0
+    x = keras.layers.Convolution3D(32, kernel_size=(3, 3, 3), padding = 'same', activation = 'relu')(in_)
+    x = keras.layers.MaxPooling3D(pool_size=(2, 2, 2))(x)
+    # conv block 1
+    x = keras.layers.Convolution3D(32, kernel_size=(3, 3, 3), padding = 'same', activation = 'relu')(x)
+    x = keras.layers.MaxPooling3D(pool_size=(2, 2, 2))(x)
+    # conv block 2
+    x = keras.layers.Convolution3D(64, kernel_size=(3, 3, 3), padding = 'same', activation = 'relu')(x)
+    x = keras.layers.MaxPooling3D(pool_size=(2, 2, 2))(x)
+    # conv block 3
+    x = keras.layers.Convolution3D(64, kernel_size=(3, 3, 3), padding = 'same', activation = 'relu')(x)
+    x = keras.layers.MaxPooling3D(pool_size=(2, 2, 2))(x)
+
+    # cnn to flat connection
+    x = keras.layers.GlobalAveragePooling3D()(x) 
+    
+    # flat block
+    x = keras.layers.Dense(128, activation = 'relu')(x)
+    x = keras.layers.Dropout(0.3)(x)
+    x = keras.layers.Dense(128, activation = 'relu')(x)
+    x = keras.layers.Dropout(0.3)(x)
+    out_ = keras.layers.Dense(output_shape, activation = activation, use_bias = False, 
+                              name = "dense_complex_intercept")(x) 
+    nn_im = keras.Model(inputs = in_, outputs = out_, name = "mod_complex_intercept")
+    return nn_im
+
 # Define the 3d cnn model parameters for binary stroke classification based on the current model version
 def model_setup(version, input_dim = (128, 128, 28, 1), ):
     # version: string, model version, e.g. 10Fold_sigmoid_V0
@@ -136,15 +172,15 @@ def model_init(version,
             optimizer=keras.optimizers.Adam(learning_rate=learning_rate),
             metrics=["acc", tf.keras.metrics.AUC()])
     elif "CIBLSX" in version:
-        mbl = utils.img_model_linear_final(input_dim, output_dim)
-        mls = utils.mod_linear_shift(input_dim_tab)
+        mbl = img_model_linear_final(input_dim, output_dim)
+        mls = mod_linear_shift(input_dim_tab)
         model_3d = ontram(mbl, mls)             
 
         model_3d.compile(optimizer=keras.optimizers.Adam(learning_rate=learning_rate),
                                         loss=ontram_loss(C, batch_size),
                                         metrics=[ontram_acc(C, batch_size)])
     elif "CIB" in version:
-        mbl = utils.img_model_linear_final(input_dim, output_dim)
+        mbl = img_model_linear_final(input_dim, output_dim)
         model_3d = ontram(mbl)             
 
         model_3d.compile(optimizer=keras.optimizers.Adam(learning_rate=learning_rate),
