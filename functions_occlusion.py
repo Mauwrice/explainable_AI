@@ -3,7 +3,6 @@ import tensorflow as tf
 import functions_metrics as fm
 
 
-
 # Occlusion Iteration: 
 # Generatess all possible occlusions of a given size and stride for a given volume
 # stride must be smaller or equal size
@@ -41,7 +40,8 @@ def volume_occlusion(volume, res_tab,
                      invert_hm = "pred_class",
                      model_mode = "mean",
                      occlusion_stride = None,
-                     input_shape = (128,128,28,1)):
+                     input_shape = (128,128,28,1),
+                     reset_cut_off = False):
     # volume: np array in shape of input_shape
     # res_tab: dataframe with results of all models
     # tabular_df: dataframe with normalized tabular data, is only needed when models use tabular data
@@ -155,23 +155,21 @@ def volume_occlusion(volume, res_tab,
         
         ## Get cutoff, invert heatmap if necessary and normalize
         cut_off = res_tab["y_pred_model_" + model_name[-4:-3]][0]
+        if (reset_cut_off):
+            occ_dataset_pred = ((np.expand_dims(volume, axis=0), filtered_df))
+            preds = cnn.predict(occ_dataset_pred)
+            cut_off = 1-fm.sigmoid(preds[:,0]-preds[:,1])
     
+        hm = hm - cut_off
         if (res_tab[y_pred_class][0] == 0 and invert_hm == "pred_class" and not both_directions) or (
             invert_hm == "never" and not both_directions): 
-            hm[hm < cut_off] = cut_off
+            hm[hm < 0] = 0
         elif (res_tab[y_pred_class][0] == 1 and invert_hm == "pred_class" and not both_directions) or (
             invert_hm == "always" and not both_directions):
-            hm[hm > cut_off] = cut_off
-        # heatmap must be inverted later because else highest value has lowest impact
-        elif both_directions:
-            hm = hm - cut_off
+            hm[hm > 0] = 0
         
-        if normalize and not both_directions:
-            hm = ((hm - hm.min())/(hm.max()-hm.min()))
-        elif normalize and both_directions:
-            hm_min_max = [np.min(hm), np.max(hm)]
-            hm_abs_max = np.max(np.abs(hm_min_max))
-            hm = hm / hm_abs_max
+        if normalize:
+            hm = fm.normalize_heatmap(hm, both_directions=both_directions)
         
         h_l.append(hm)
         
@@ -187,19 +185,16 @@ def volume_occlusion(volume, res_tab,
     elif model_mode == "weighted":
         heatmap = np.average(h_l, axis=0, weights=weights)
         
-    if normalize and not both_directions:
-        heatmap = ((heatmap - heatmap.min())/(heatmap.max()-heatmap.min()))
-    elif normalize and both_directions:
-        heatmap_min_max = [np.min(heatmap), np.max(heatmap)]
-        heatmap_abs_max = np.max(np.abs(heatmap_min_max))
-        heatmap = heatmap / heatmap_abs_max
+    if normalize:
+        heatmap = fm.normalize_heatmap(heatmap, both_directions=both_directions)
         
     # invert at the end else inversion is done on unnormalized heatmap
-    if invert_hm == "pred_class" and res_tab[y_pred_class][0] == 1:
+    if ((invert_hm == "pred_class" and res_tab[y_pred_class][0] == 1 and normalize) or
+        (invert_hm == "always" and normalize)):
         heatmap = 1 - heatmap  
-    elif invert_hm == "always":
-        heatmap = 1 - heatmap
-    elif both_directions: 
+    elif (both_directions or 
+          (invert_hm == "pred_class" and res_tab[y_pred_class][0] == 1 and not normalize) or
+          (invert_hm == "always" and not normalize)): 
         # inversion so interpretation is same as gradcam (positive heatmap => unfavorable, neg hm => favorable)
         heatmap = heatmap * -1
         
