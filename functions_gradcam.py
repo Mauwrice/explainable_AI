@@ -7,7 +7,7 @@ import functions_metrics as fm
 
 ### GradCam for specific layer
 def grad_cam_3d(img, model_3d, layer, pred_index=None, 
-                inv_hm=False, gcplusplus=True, normalize = True):
+                inv_hm=False, relu_hm=True, normalize = True):
     # adapted from: https://keras.io/examples/vision/grad_cam/
 
     # img: 3d image
@@ -15,8 +15,8 @@ def grad_cam_3d(img, model_3d, layer, pred_index=None,
     # layer: layer name of model_3d where gradcam should be applied
     # pred_index: output channel when sigmoid should always be 0, when softmax 0 favorable, 1 unfavorable
     # inv_hm: invert heatmap
-    # gcplusplus: use gradcam++ instead of gradcam (only positive values)
-    # normalize: normalize between 0 and 1 or -1 and 1 respectively (see gcplusplus)
+    # relu_hm: use only positive values of heatmap (classic gradcam)
+    # normalize: normalize between 0 and 1 or -1 and 1 respectively
     
     # First, we create a MODEL that maps the input image to the activations
     # of the last conv layer as well as the output predictions
@@ -51,7 +51,7 @@ def grad_cam_3d(img, model_3d, layer, pred_index=None,
     # We multiply each channel in the feature map array
     # by "how important this channel is" with regard to the top predicted class
     # then sum all the channels to obtain the heatmap class activation
-    output = conv_outputs[0]    
+    output = conv_outputs[0]   
     
     # slower implementation:
 #     cam = np.zeros(output.shape[0:3], dtype=np.float32)
@@ -73,7 +73,7 @@ def grad_cam_3d(img, model_3d, layer, pred_index=None,
         heatmap = heatmap * (-1)
     
     if normalize:
-        if gcplusplus: #relu (max to 1)
+        if relu_hm: #relu (max to 1)
             heatmap = tf.maximum(heatmap, 0) / tf.math.reduce_max(heatmap)
         else:
             # normalize heatmap between -1 and 1 (absolute max is then -1 or 1)
@@ -82,14 +82,12 @@ def grad_cam_3d(img, model_3d, layer, pred_index=None,
             heatmap = heatmap / heatmap_abs_max
         heatmap = heatmap.numpy()
     else:
-        if gcplusplus: # true relu
+        if relu_hm: # true relu
             heatmap = tf.maximum(heatmap, 0)
             heatmap = heatmap.numpy()
         # else: heatmap is already numpy because of resize
     
     resized_img = img.reshape(img.shape[1:])
-
-    print(heatmap.min(), heatmap.max())
     
     return heatmap, resized_img
 
@@ -97,7 +95,7 @@ def grad_cam_3d(img, model_3d, layer, pred_index=None,
 ### GradCam for multiple layers (mean, median or max of all layers can be used)
 def multi_layers_grad_cam_3d(img, model_3d, layers, mode = "mean", 
                              normalize = True, pred_index=None, 
-                             invert_hm="none", gcpp_hm="all"):
+                             invert_hm="none", pos_hm="all"):
     # img: 3d image
     # model_3d: 3d cnn model with loaded weights
     # layers: list of layer names of model_3d where gradcam should be applied
@@ -106,9 +104,9 @@ def multi_layers_grad_cam_3d(img, model_3d, layers, mode = "mean",
     # pred_index: output channel when sigmoid should always be 0, when softmax 0 favorable, 1 unfavorable
     # invert_hm: one of "none", "all", "last", 
     #      if "all" then all heatmaps are inverted, if "last" then only last heatmap is inverted
-    # gcpp_hm: one of "all", "none", "last", 
+    # pos_hm: one of "all", "none", "last", 
     #      if "all" then all heatmaps are positive, if "none" then all heatmaps are negative,
-    #      if "last" then only last heatmap is positive (gradcam++)
+    #      if "last" then only last heatmap is positive
     
     
     ## Check input
@@ -118,12 +116,12 @@ def multi_layers_grad_cam_3d(img, model_3d, layers, mode = "mean",
     valid_hm_inverts = ["none", "all", "last"]
     if invert_hm not in valid_hm_inverts:
         raise ValueError("multi_layers_grad_cam_3d: invert_hm must be one of %r." % valid_hm_inverts)
-    valid_hm_gcpp = ["all", "none", "last"]
-    # all: all layers use gradcam++, 
-    # none: no layer uses gradcam++, 
-    # last: only last layer uses gradcam++
-    if gcpp_hm not in valid_hm_gcpp:
-        raise ValueError("multi_layers_grad_cam_3d: gcpp_hm must be one of %r." % valid_hm_gcpp)
+    valid_hm_pos = ["all", "none", "last"]
+    # all: all layers use only positive heatmap values, 
+    # none: no layer uses only positive heatmap values, 
+    # last: only last layer uses positive heatmap values
+    if pos_hm not in valid_hm_pos:
+        raise ValueError("multi_layers_grad_cam_3d: pos_hm must be one of %r." % valid_hm_pos)
         
     if not isinstance(layers, list):
         layers = [layers]
@@ -132,24 +130,24 @@ def multi_layers_grad_cam_3d(img, model_3d, layers, mode = "mean",
     h_l = []
     for i, layer in enumerate(layers):
         
-        # check if gradcam++ should be used
-        gcpp = True
-        if (i != len(layers)-1 and gcpp_hm == "last") or gcpp_hm == "none":
-            gcpp = False 
+        # check if only positive heatmap values should be used
+        positive_hm_only = True
+        if (i != len(layers)-1 and pos_hm == "last") or pos_hm == "none":
+            positive_hm_only = False 
         
         if (i == len(layers)-1 and invert_hm == "last") or invert_hm == "all":
             heatmap, resized_img = grad_cam_3d(
                 img = img, model_3d = model_3d , layer = layer, 
-                pred_index=pred_index, inv_hm=True, gcplusplus=gcpp, normalize=normalize)
+                pred_index=pred_index, inv_hm=True, relu_hm=positive_hm_only, normalize=normalize)
         else:
             heatmap, resized_img = grad_cam_3d(
                 img = img, model_3d = model_3d , layer = layer, 
-                pred_index=pred_index, inv_hm=False, gcplusplus=gcpp, normalize=normalize)
+                pred_index=pred_index, inv_hm=False, relu_hm=positive_hm_only, normalize=normalize)
         h_l.append(heatmap)
         
     h_l = np.array(h_l)
     
-    if gcpp_hm == "last":
+    if pos_hm == "last":
         # if all, then everything is already positive
         # if none, then absolute is not applied
         h_l = np.abs(h_l)
@@ -163,9 +161,9 @@ def multi_layers_grad_cam_3d(img, model_3d, layers, mode = "mean",
         heatmap = np.max(h_l, axis = 0) 
         
     ## Normalize heatmap
-    if normalize and gcpp_hm in ["last", "all"] and heatmap.max() != 0:
+    if normalize and pos_hm in ["last", "all"] and heatmap.max() != 0:
         heatmap = ((heatmap - heatmap.min())/(heatmap.max()-heatmap.min()))
-    elif normalize and gcpp_hm == "none" and heatmap.max() != 0:
+    elif normalize and pos_hm == "none" and heatmap.max() != 0:
         heatmap_min_max = [tf.math.reduce_min(heatmap), tf.math.reduce_max(heatmap)]
         heatmap_abs_max = tf.math.reduce_max(tf.math.abs(heatmap_min_max))
         heatmap = heatmap / heatmap_abs_max
@@ -184,7 +182,7 @@ def multi_models_grad_cam_3d(img, cnn, model_names, layers,
                              model_mode = "mean", layer_mode = "mean", 
                              normalize = True, pred_index=None,
                              model_weights=None,
-                             invert_hm="none", gcpp_hm="last"):
+                             invert_hm="none", pos_hm="last"):
     # img: 3d image
     # cnn: 3d cnn model without loaded weights
     # model_names: list of model names (with path) of cnn, to load weights
@@ -195,9 +193,9 @@ def multi_models_grad_cam_3d(img, cnn, model_names, layers,
     # pred_index: output channel when sigmoid should always be 0, when softmax 0 favorable, 1 unfavorable
     # invert_hm: one of "none", "all", "last",
     #     if "all" then all heatmaps are inverted, if "last" then only last heatmap is inverted
-    # gcpp_hm: one of "all", "none", "last", 
+    # pos_hm: one of "all", "none", "last", 
     #     if "all" then all heatmaps are positive, if "none" then all heatmaps are negative,
-    #     if "last" then only last heatmap is positive (gradcam++)
+    #     if "last" then only last heatmap is positive
 
     ## Check input
     valid_modes = ["mean", "median", "max", "weighted"]
@@ -220,7 +218,7 @@ def multi_models_grad_cam_3d(img, cnn, model_names, layers,
         cnn.load_weights(model_name)
         heatmap, resized_img = multi_layers_grad_cam_3d(
             img = img, model_3d = cnn , layers = layers, mode = layer_mode, normalize = normalize, 
-            pred_index=pred_index, invert_hm=invert_hm, gcpp_hm=gcpp_hm)
+            pred_index=pred_index, invert_hm=invert_hm, pos_hm=pos_hm)
         h_l.append(heatmap)
     
     ## Combine heatmaps of all models
@@ -235,9 +233,9 @@ def multi_models_grad_cam_3d(img, cnn, model_names, layers,
         heatmap = np.average(h_l, axis=0, weights=weights)
         
     ## Normalize heatmap
-    if normalize and gcpp_hm in ["last", "all"] and heatmap.max() != 0:
+    if normalize and pos_hm in ["last", "all"] and heatmap.max() != 0:
         heatmap = ((heatmap - heatmap.min())/(heatmap.max()-heatmap.min()))
-    elif normalize and gcpp_hm == "none" and heatmap.max() != 0:
+    elif normalize and pos_hm == "none" and heatmap.max() != 0:
         heatmap_min_max = [tf.math.reduce_min(heatmap), tf.math.reduce_max(heatmap)]
         heatmap_abs_max = tf.math.reduce_max(tf.math.abs(heatmap_min_max))
         heatmap = heatmap / heatmap_abs_max

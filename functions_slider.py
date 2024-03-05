@@ -75,12 +75,12 @@ def gradcam_interactive_plot(p_id, vis_layers,
     ## Generate heatmap
     if pred_hm_only:
         invert_hm = "all" if res_table[y_pred_cl][0] == 0 else "none"
-        gcpp_hm = "last"
+        pos_hm = "last"
         cmap = "jet"
         hm_positive=True
     else:
         invert_hm = "none"
-        gcpp_hm = "none"
+        pos_hm = "none"
         cmap = "bwr"
         hm_positive=False
     
@@ -93,7 +93,7 @@ def gradcam_interactive_plot(p_id, vis_layers,
             model_mode = model_mode,
             pred_index = 0,
             invert_hm = invert_hm,
-            gcpp_hm = gcpp_hm,
+            pos_hm = pos_hm,
             # model weigths are only used when model_mode = "weighted"
             model_weights = res_table[0:1].reset_index(drop = True).loc[:, 
                 res_table.columns.str.startswith("weight")].to_numpy().squeeze(),
