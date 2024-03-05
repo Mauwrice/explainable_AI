@@ -214,3 +214,20 @@ def wght_variance(values, weights=None, axis=None):
     average = np.expand_dims(np.average(values, weights=weights, axis=axis), axis=axis)
     variance = np.average((values-average)**2, weights=weights, axis=axis)
     return variance
+
+def normalize_heatmap(hm, both_directions = False, hm_min_max = None):
+    # hm: heatmap to normalize
+    # both_directions: whether to normalize to [-1,1] or [0,1]
+    #
+    # returns normalized heatmap
+
+    if hm_min_max is None:
+        hm_min_max = [np.min(hm), np.max(hm)]
+
+    if not both_directions:
+        hm = ((hm - hm_min_max[0])/(hm_min_max[1]-hm_min_max[0]))
+    elif both_directions:
+        hm_abs_max = np.max(np.abs(hm_min_max))
+        hm = hm / hm_abs_max
+
+    return hm
