@@ -13,7 +13,7 @@ def iter_occlusion(volume, size, stride):
     # size: 3 element array or tuple
     # stride: 3 element array or tuple
 
-    occlusion_center = np.full((size[0], size[1], size[2], 1), [0.5], np.float32)
+    occlusion_center = np.full((size[0], size[1], size[2], 1), [0], np.float32)
 
     for x in range(0, volume.shape[0]-size[0]+1, stride[0]):
         for y in range(0, volume.shape[1]-size[1]+1, stride[1]):
@@ -99,15 +99,17 @@ def volume_occlusion(volume, res_tab,
             raise ValueError('shape and size do not match')
     
     y_pred_class = "y_pred_class_avg"
+    model_nrs = range(0,5)
     if model_mode == "weighted":
         weights = res_tab.loc[:, res_tab.columns.str.startswith("weight")].to_numpy().squeeze()
         y_pred_class += "_w"
         model_names = list(np.array(model_names)[weights > 0])
+        model_nrs = np.where(weights>0)[0]
         weights = weights[weights>0] 
   
     ## loop over models
     h_l = []
-    for model_name in model_names:
+    for iter_nr, model_name in enumerate(model_names):
         cnn.load_weights(model_name)
         
         heatmap_prob_sum = np.zeros((volume.shape[0], volume.shape[1], volume.shape[2]), np.float32)
@@ -153,13 +155,17 @@ def volume_occlusion(volume, res_tab,
 
         hm = heatmap_prob_sum / heatmap_occ_n # calculate average probability per voxel
         
-        ## Get cutoff, invert heatmap if necessary and normalize
-        cut_off = res_tab["y_pred_model_" + model_name[-4:-3]][0]
-        if (reset_cut_off):
+        ## Get cutoff and subtract from heatmap, (set part to 0 if necessary)
+        cut_off = res_tab["y_pred_model_" + str(model_nrs[iter_nr])][0]
+        if (reset_cut_off) and ("ontram" in cnn.name) and (not isinstance(cnn.input, list)):
             occ_dataset_pred = ((np.expand_dims(volume, axis=0), filtered_df))
             preds = cnn.predict(occ_dataset_pred)
             cut_off = 1-fm.sigmoid(preds[:,0]-preds[:,1])
-    
+        elif (reset_cut_off) and ("ontram" in cnn.name) and (isinstance(cnn.input, list)):
+            cut_off = 1-fm.sigmoid(cnn.predict((np.expand_dims(volume, axis=0), filtered_df)))
+        elif (reset_cut_off) and ("ontram" not in cnn.name):
+            cut_off = cnn.predict(np.expand_dims(volume, axis=0))
+
         hm = hm - cut_off
         if (res_tab[y_pred_class][0] == 0 and invert_hm == "pred_class" and not both_directions) or (
             invert_hm == "never" and not both_directions): 

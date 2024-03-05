@@ -193,7 +193,7 @@ def occlusion_interactive_plot(p_id, occ_size, occ_stride,
         gen_model_name = generate_model_name,
         num_models = num_models)
     
-    if model_mode == "weigthed":
+    if model_mode == "weighted":
         y_pred_cl = "y_pred_class_avg_w"
         pred_co = "pred_correct_w"
         y_pred_prob = "y_pred_trafo_avg_w"
