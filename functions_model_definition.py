@@ -24,9 +24,7 @@ def stroke_binary_3d(input_dim = (128, 128, 28,1),
     valid_activation = ["sigmoid", "linear", "softmax"]
     if last_activation not in valid_activation:
         raise ValueError("stroke_binary_3d: last_activation must be one of %r." % valid_activation)
-        
-#     initializer = keras.initializers.he_normal(seed = 2202)
-    
+           
     #input
     inputs = keras.Input(input_dim)
     
@@ -45,15 +43,7 @@ def stroke_binary_3d(input_dim = (128, 128, 28,1),
     # conv block 3
     x = layers.Convolution3D(64, kernel_size=(3, 3, 3), padding = 'same',activation = 'relu')(x)
     x = layers.MaxPooling3D(pool_size=(2, 2, 2))(x)
-    
-    ## conv block 4
-    #x = layers.Convolution3D(256, kernel_size=(3, 3, 3), padding = 'same',activation = 'relu', kernel_initializer = initializer)(x)
-    #x = layers.BatchNormalization(center=True, scale=True)(x)
-    #x = layers.Convolution3D(256, kernel_size=(3, 3, 3), padding = 'same',activation = 'relu', kernel_initializer = initializer)(x)
-    #x = layers.BatchNormalization(center=True, scale=True)(x)
-    #x = layers.MaxPooling3D(pool_size=(2, 2, 2), padding='same')(x)
-    #x = layers.Dropout(0.3)(x)
-    
+       
     # cnn to flat connection
     if layer_connection == list(valid_layer_connection)[0]:
         x = layers.Flatten()(x)
@@ -80,15 +70,21 @@ def stroke_binary_3d(input_dim = (128, 128, 28,1),
     return model_3d
 
 # Model for linear shift terms
-def mod_linear_shift(x):
+def mod_linear_shift(x, weights = None):
     mod = keras.Sequential(name = "mod_linear_shift")
     mod.add(keras.Input(shape = (x, )))
-    mod.add(keras.layers.Dense(1, activation = "linear", use_bias = False))
+    dense_layer = keras.layers.Dense(1, activation = "linear", use_bias = False)
+
+    if weights is not None:
+        dense_layer.set_weights([weights])
+    
+    mod.add(dense_layer)
     return mod
+
 
 # Model for complex intercept
 def img_model_linear_final(input_shape, output_shape, activation = "linear"):
-    initializer = keras.initializers.he_normal(seed = 2202)
+    
     in_ = keras.Input(shape = input_shape)
 
     # conv block 0
@@ -151,7 +147,9 @@ def model_init(version,
                learning_rate = 5*1e-5,
                batch_size = 6,
                input_dim = (128, 128, 28, 1),
-               input_dim_tab = None):
+               input_dim_tab = None,
+               weights_tab_init = None):
+    
     # version: string, model version, e.g. 10Fold_sigmoid_V0
     # output_dim: integer, if sigmoid, linear activation or ontram 1 must be used, if softmax then 2
     # LOSS: string or function, loss function
@@ -173,7 +171,7 @@ def model_init(version,
             metrics=["acc", tf.keras.metrics.AUC()])
     elif "CIBLSX" in version:
         mbl = img_model_linear_final(input_dim, output_dim)
-        mls = mod_linear_shift(input_dim_tab)
+        mls = mod_linear_shift(input_dim_tab, weights=weights_tab_init)
         model_3d = ontram(mbl, mls)             
 
         model_3d.compile(optimizer=keras.optimizers.Adam(learning_rate=learning_rate),
@@ -229,4 +227,8 @@ def get_last_conv_layer(model):
     vis_layers = [i.name for i in model.layers]
     vis_layers = [vis_layer for vis_layer in vis_layers if vis_layer.startswith("conv")]
     return vis_layers[-1]
+
+
+
+
 
