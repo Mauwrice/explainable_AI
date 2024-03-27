@@ -88,6 +88,84 @@ def bin_class_report(X_test,y_test, model):
     print("Negative Log-Likelihood :", np.around(NLL, 4))
     return (AUC, NLL, sens, spec)
 
+def compute_bootstrap_ci(y_true, y_pred, n_bootstraps=10000, rng_seed=42, alpha=0.05, 
+                         metric = metrics.roc_auc_score, **kwargs):
+    # y_true: true binary labels
+    # y_pred: target scores, can either be probability estimates of the positive class, 
+    #         confidence values, or non-thresholded measure of decisions
+    # n_bootstraps: number of bootstrap samples to use
+    # rng_seed: seed for the random number generator
+    # alpha: significance level (type I error rate)  
+    # metric: metric to be used  
+    
+    bootstrapped_scores = []
+
+    rng = np.random.RandomState(rng_seed)
+    for i in range(n_bootstraps):
+        # bootstrap by sampling with replacement on the prediction indices
+        indices = rng.randint(0, len(y_pred), len(y_pred))
+        if len(np.unique(y_true[indices])) < 2:
+            # We need at least one positive and one negative sample for ROC AUC
+            # to be defined: reject the sample
+            continue
+
+        score = metric(y_true[indices], y_pred[indices], **kwargs)
+        bootstrapped_scores.append(score)
+        
+    sorted_scores = np.array(bootstrapped_scores)
+    sorted_scores.sort()
+    
+    confidence_lower = sorted_scores[int(alpha/2 * len(sorted_scores))]
+    confidence_upper = sorted_scores[int(1-alpha/2 * len(sorted_scores))]
+    
+    return (confidence_lower, confidence_upper)
+
+# Computes a classification report for a binary model 
+#  including AUC, NLL, sensitivity, specificity, and accuracy
+def bin_class_report_ontram(y_true, y_pred_binary, y_pred):
+    # y_true: true values
+    # y_pred_binary: binarized predictions
+    # y_pred: transformed average predictions (probabilities)
+      
+    # cm , AUC
+    cm = confusion_matrix(y_true, y_pred_binary)
+    AUC =  metrics.roc_auc_score(y_true, y_pred_binary)
+    AUC0 =  metrics.roc_auc_score(y_true, y_pred)
+    # AUC CI
+    AUC_CI = compute_bootstrap_ci(y_true, y_pred_binary, metric=metrics.roc_auc_score)
+    AUC0_CI = compute_bootstrap_ci(y_true, y_pred, metric=metrics.roc_auc_score)
+    #acc
+    nobs = sum(sum(cm))
+    count = sum([cm[0,0], cm[1,1]])
+    Acc = count/nobs
+    acc_ci_low, acc_ci_upp = proportion_confint(count , nobs,  alpha=0.05, method='wilson')
+    #sens 
+    sens = cm[1,1]/(cm[1,1]+cm[1,0])
+    nobs = sum([cm[1,0],cm[1,1]])
+    count = sum([cm[1,1]])
+    sens_ci_low, sens_ci_upp = proportion_confint(count , nobs,  alpha=0.05, method='wilson')
+    #spec 
+    spec = cm[0,0]/(cm[0,1]+cm[0,0])
+    nobs = sum([cm[0,1],cm[0,0]])
+    count = sum([cm[0,0]])
+    spec_ci_low, spec_ci_upp = proportion_confint(count , nobs,  alpha=0.05, method='wilson')
+    # nll
+    nll = metrics.log_loss(y_true, y_pred)
+    nll_ci_low, nll_ci_upp = compute_bootstrap_ci(y_true, y_pred, metric=metrics.log_loss)
+    # f1
+    f1_value = metrics.f1_score(y_true, y_pred_binary)
+    f1_ci_low, f1_ci_upp = compute_bootstrap_ci(y_true, y_pred_binary, metric=metrics.f1_score)
+
+    
+    print("Performance on Test Set : ")
+    print("\nAccuracy    [95% Conf.] :", np.around(Acc,4), np.around([acc_ci_low, acc_ci_upp],4))
+    print("Sensitivity [95% Conf.] :", np.around(sens,4), np.around([sens_ci_low, sens_ci_upp],4))
+    print("Specificity [95% Conf.] :", np.around(spec,4), np.around([spec_ci_low, spec_ci_upp],4))
+    print("F1 Score [95% Conf.] :", np.around(f1_value,4), np.around([f1_ci_low, f1_ci_upp],4))
+    print("Area under Curve (AUC) Binary [95% Conf.]:", np.around(AUC,4),np.around([AUC_CI[0], AUC_CI[1]],4))
+    print("Area under Curve (AUC) Probability [95% Conf.]:", np.around(AUC0,4),np.around([AUC0_CI[0], AUC0_CI[1]],4))
+    print("Negative Log-Likelihood :", np.around(nll, 4), np.around([nll_ci_low, nll_ci_upp],4))
+
 # Computes a classification report for a binary model for given predictions and labels
 def calc_metrics(y, p):
     # y: true binary labels
