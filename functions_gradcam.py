@@ -6,13 +6,15 @@ from skimage.transform import resize
 import functions_metrics as fm
 
 ### GradCam for specific layer
-def grad_cam_3d(img, model_3d, layer, pred_index=None, 
+def grad_cam_3d(img, model_3d, layer, 
+                tabular_df = None, pred_index=None, 
                 inv_hm=False, relu_hm=True, normalize = True):
     # adapted from: https://keras.io/examples/vision/grad_cam/
 
     # img: 3d image
     # model_3d: 3d cnn model with loaded weights
     # layer: layer name of model_3d where gradcam should be applied
+    # tabular_df: dataframe with normalized tabular data, is only needed when models use tabular data
     # pred_index: output channel when sigmoid should always be 0, when softmax 0 favorable, 1 unfavorable
     # inv_hm: invert heatmap
     # relu_hm: use only positive values of heatmap (classic gradcam)
@@ -43,6 +45,28 @@ def grad_cam_3d(img, model_3d, layer, pred_index=None,
     # This is the gradient of the output neuron
     # with regard to the output feature map of the last conv layer
     grads = tape.gradient(class_channel, conv_outputs)[0]
+
+    # gradcam for models with tabular data only doesnt make sense, so second check is ok
+    if model_3d.name == "mod_ontram" and not isinstance(model_3d.input, list):
+        # output of CNN can be used for predictions
+        grads = fm.sigmoid(predictions) * (1 - fm.sigmoid(predictions)) * grads # sigmoid gradient
+    elif model_3d.name == "mod_ontram" and isinstance(model_3d.input, list):
+        # in this case prediction must be made with tabular data
+        # ToDo: make function for CIBLSX prediction (also used in occlusion)
+
+        # for ordinal prediction ontram_predict must be used, 
+        # as the correct probability has to be taken in order to calculate the gradient
+        # best thing to do is to implement a new function which can be used for both gradcam and occlusion
+        # and also for all different models (tab only, im only, tab+im)
+
+        filtered_df = tabular_df.drop(['index', 'p_id'], axis=1).values
+        preds = model_3d.predict([img, filtered_df])
+        out = 1-fm.sigmoid(preds[:,0]-preds[:,1])
+
+        grads = out * (1 - out) * grads # sigmoid (out = sigmoid(predictions)) gradient
+
+
+
     
     # Average gradients spatially
     weights = tf.reduce_mean(grads, axis=(0, 1, 2)) # pooled grads
@@ -93,12 +117,14 @@ def grad_cam_3d(img, model_3d, layer, pred_index=None,
 
 
 ### GradCam for multiple layers (mean, median or max of all layers can be used)
-def multi_layers_grad_cam_3d(img, model_3d, layers, mode = "mean", 
+def multi_layers_grad_cam_3d(img, model_3d, layers, tabular_df = None,
+                             mode = "mean", 
                              normalize = True, pred_index=None, 
                              invert_hm="none", pos_hm="all"):
     # img: 3d image
     # model_3d: 3d cnn model with loaded weights
     # layers: list of layer names of model_3d where gradcam should be applied
+    # tabular_df: dataframe with normalized tabular data, is only needed when models use tabular data
     # mode: mean, median or max, how to combine the heatmaps of the layers
     # normalize: normalize heatmaps between 0 and 1
     # pred_index: output channel when sigmoid should always be 0, when softmax 0 favorable, 1 unfavorable
@@ -138,11 +164,13 @@ def multi_layers_grad_cam_3d(img, model_3d, layers, mode = "mean",
         if (i == len(layers)-1 and invert_hm == "last") or invert_hm == "all":
             heatmap, resized_img = grad_cam_3d(
                 img = img, model_3d = model_3d , layer = layer, 
-                pred_index=pred_index, inv_hm=True, relu_hm=positive_hm_only, normalize=normalize)
+                tabular_df = tabular_df, pred_index=pred_index, 
+                inv_hm=True, relu_hm=positive_hm_only, normalize=normalize)
         else:
             heatmap, resized_img = grad_cam_3d(
                 img = img, model_3d = model_3d , layer = layer, 
-                pred_index=pred_index, inv_hm=False, relu_hm=positive_hm_only, normalize=normalize)
+                tabular_df = tabular_df, pred_index=pred_index, 
+                inv_hm=False, relu_hm=positive_hm_only, normalize=normalize)
         h_l.append(heatmap)
         
     h_l = np.array(h_l)
@@ -179,6 +207,7 @@ def multi_layers_grad_cam_3d(img, model_3d, layers, mode = "mean",
 # Returns combined heatmap, the original image, the slice with the highest 
 #   heatmap value and the mean std of the heatmaps
 def multi_models_grad_cam_3d(img, cnn, model_names, layers, 
+                             tabular_df = None,
                              model_mode = "mean", layer_mode = "mean", 
                              normalize = True, pred_index=None,
                              model_weights=None,
@@ -189,6 +218,7 @@ def multi_models_grad_cam_3d(img, cnn, model_names, layers,
     # layers: list of layer names of model_3d where gradcam should be applied
     # model_mode: mean, median, max or weighted how to combine the heatmaps of the models
     # layer_mode: mean, median or max, how to combine the heatmaps of the layers
+    # tabular_df: dataframe with normalized tabular data, is only needed when models use tabular data
     # normalize: normalize heatmaps between 0 and 1
     # pred_index: output channel when sigmoid should always be 0, when softmax 0 favorable, 1 unfavorable
     # invert_hm: one of "none", "all", "last",
@@ -216,8 +246,11 @@ def multi_models_grad_cam_3d(img, cnn, model_names, layers,
     h_l = []
     for model_name in model_names:
         cnn.load_weights(model_name)
+        # ToDo: if len(layers) == 1, then directly calling grad_cam_3d would be faster 
+        #       (approx 1.2x faster). For simplicity, we use multi_layers_grad_cam_3d here.
         heatmap, resized_img = multi_layers_grad_cam_3d(
-            img = img, model_3d = cnn , layers = layers, mode = layer_mode, normalize = normalize, 
+            img = img, model_3d = cnn , layers = layers, mode = layer_mode, 
+            tabular_df = tabular_df, normalize = normalize, 
             pred_index=pred_index, invert_hm=invert_hm, pos_hm=pos_hm)
         h_l.append(heatmap)
     
@@ -260,18 +293,22 @@ def multi_models_grad_cam_3d(img, cnn, model_names, layers,
 #
 # Returns a dataframe with all results, an array of the images and a list of model names 
 #  for all patients in p_ids
-def get_img_and_models(p_ids, results, pats, imgs, gen_model_name, num_models = 5):
+def get_img_and_models(p_ids, results, pats, imgs, gen_model_name, norm_tab = None, num_models = 5):
     # p_ids: list of patient ids
     # results: dataframe with results of all patients
     # pats: array with patient ids of all images (must be same order as imgs!!!)
     # imgs: array with all images (must be same order as pats!!!)
     # gen_model_name: function that generates model names for a given test split and model number
+    # norm_tab: normalized tabular data of patients. Only used when tabular data is used in models
     # num_models: number of models per test split
     
     imgs = np.expand_dims(imgs, axis = -1)
     
     # extract table with all matches for p_ids
     res_tab = results[results.p_id.isin(p_ids)].sort_values(["p_id", "test_split"]).reset_index()
+    if norm_tab is not None:
+        norm_tab = norm_tab[
+            norm_tab.p_id.isin(p_ids)].sort_values(["p_id"]).reset_index()
     
     res_imgs = []
     res_mod_names = []
@@ -286,7 +323,7 @@ def get_img_and_models(p_ids, results, pats, imgs, gen_model_name, num_models = 
             [gen_model_name(res_test_splits[i], j) for j in range(num_models)]
         )
             
-    return (res_tab, np.array(res_imgs), res_mod_names)
+    return (res_tab, np.array(res_imgs), res_mod_names, norm_tab)
 
   
     

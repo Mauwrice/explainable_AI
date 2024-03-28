@@ -28,6 +28,7 @@ def gradcam_interactive_plot(p_id, vis_layers,
                              y_pred_cl = "y_pred_class_avg",
                              normalize_hm = True,
                              model_mode = "mean",
+                             pat_norm_table = None,
                              heatmaps = None):
     # p_id: patient id
     # vis_layers: the layers for which the heatmap is generated, should be last layer
@@ -37,18 +38,19 @@ def gradcam_interactive_plot(p_id, vis_layers,
     # X_in: the images (same order as pat)
     # generate_model_name: function to generate the model names
     # num_models: number of models per fold
-    # pat_dat: the patient data table
+    # norm_table: normalized table for the patient data
     # pred_hm_only: if True then the heatmap is only plotted for the predicted class
     #               if False then the positive and negative heatmap is plotted
     # y_pred_cl: the column name of the predicted class
     # normalize_hm: if True then the heatmap is normalized
     # model_mode: the mode for the model (mean, median, max or weighted)
+    # pat_norm_dat: the patient data table (non normalized)
     # heatmaps: if None then the heatmaps are generated, otherwise the heatmaps must be provided (same order as X_in)
     
     p_ids = [p_id]
-    (res_table, res_images, res_model_names) = gc.get_img_and_models(
+    (res_table, res_images, res_model_names, res_norm_table) = gc.get_img_and_models(
         p_ids, results = all_results, pats = pat, imgs = X_in, 
-        gen_model_name = generate_model_name,
+        gen_model_name = generate_model_name, norm_tab = pat_norm_table,
         num_models = num_models)
     
     if model_mode == "weighted":
@@ -97,6 +99,7 @@ def gradcam_interactive_plot(p_id, vis_layers,
             # model weigths are only used when model_mode = "weighted"
             model_weights = res_table[0:1].reset_index(drop = True).loc[:, 
                 res_table.columns.str.startswith("weight")].to_numpy().squeeze(),
+            tabular_df = res_norm_table,
             normalize = normalize_hm)
     else:
         heatmap = heatmaps[np.argwhere(pat == p_id).squeeze()]
@@ -188,9 +191,9 @@ def occlusion_interactive_plot(p_id, occ_size, occ_stride,
     
     ####### redundant bc also in gradcam slicer => make function
     p_ids = [p_id]
-    (res_table, res_images, res_model_names) = gc.get_img_and_models(
+    (res_table, res_images, res_model_names, res_norm_table) = gc.get_img_and_models(
         p_ids, results = all_results, pats = pat, imgs = X_in, 
-        gen_model_name = generate_model_name,
+        gen_model_name = generate_model_name, norm_tab = pat_norm_table,
         num_models = num_models)
     
     if model_mode == "weighted":
@@ -235,7 +238,7 @@ def occlusion_interactive_plot(p_id, occ_size, occ_stride,
             occlusion_size = np.array(occ_size), 
             cnn = cnn,
             invert_hm=invert_hm,
-            tabular_df=pat_norm_table,
+            tabular_df=res_norm_table,
             model_mode = model_mode,
             both_directions=both_directions,
             model_names = res_model_names[0],
