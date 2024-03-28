@@ -6,6 +6,7 @@ from keras.models import Model
 from k_ontram_functions.ontram import ontram
 from k_ontram_functions.ontram_loss import ontram_loss
 from k_ontram_functions.ontram_metrics import ontram_acc
+import numpy as np
 
 # Define the 3d cnn model for binary stroke classification      
 # Consists of 4 convolutional blocks, 1 fully connected block and 1 output layer
@@ -72,13 +73,11 @@ def stroke_binary_3d(input_dim = (128, 128, 28,1),
 # Model for linear shift terms
 def mod_linear_shift(x, weights = None):
     mod = keras.Sequential(name = "mod_linear_shift")
-    mod.add(keras.Input(shape = (x, )))
-    dense_layer = keras.layers.Dense(1, activation = "linear", use_bias = False)
-
-    if weights is not None:
-        dense_layer.set_weights([weights])
+    mod.add(tf.keras.layers.Dense(1, activation="linear", use_bias=False, input_shape=(x,)))
     
-    mod.add(dense_layer)
+    if weights is not None:
+        mod.layers[0].set_weights([weights])
+    
     return mod
 
 
