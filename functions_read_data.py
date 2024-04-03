@@ -231,13 +231,15 @@ def version_setup(DATA_DIR, version, model_version, compatibility_mode = False):
     pat_orig_tab = pat_orig_tab[pat_orig_tab["p_id"].isin(pat)]
 
     if "LSX" in version:
-        pat_norm_tab = pd.read_csv(DATA_DIR + "/baseline_data_zurich_prepared.csv", sep=",")
+        pat_norm_tab = pd.read_csv(DATA_DIR + "/baseline_data_zurich_transformed_final.csv", sep=",")
         pat_norm_tab = pat_norm_tab.sort_values("p_id").reset_index(drop=True)
         pat_norm_tab = pat_norm_tab[pat_norm_tab["p_id"].isin(pat)]
         pat_norm_tab = pat_norm_tab[["p_id", "age", "sexm", "nihss_baseline", "mrs_before",
-                                     "stroke_beforey", "tia_beforey", "ich_beforey", 
-                                     "rf_hypertoniay", "rf_diabetesy", "rf_hypercholesterolemiay", 
+                                     "stroke_beforey", "tia_beforey", "rf_hypertoniay", "rf_diabetesy", "rf_hypercholesterolemiay", 
                                      "rf_smokery", "rf_atrial_fibrillationy", "rf_chdy"]]
+        
+        pat_norm_tab = pd.get_dummies(pat_norm_tab, columns=['mrs_before'], drop_first=True)
+
     else:
         pat_norm_tab = None
         
