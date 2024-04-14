@@ -45,7 +45,8 @@ def volume_occlusion(volume, res_tab,
                      reset_cut_off = False):
     # volume: np array in shape of input_shape
     # res_tab: dataframe with results of all models
-    # tabular_df: dataframe with normalized tabular data, is only needed when models use tabular data
+    # tabular_df: dataframe with normalized tabular data for given patient, 
+    #              is only needed when models use tabular data
     # occlusion_size: scalar or 3 element array, if scalar, occlusion is cubic
     # cnn: keras model
     # model_names: list of model names, to load weights
@@ -134,10 +135,13 @@ def volume_occlusion(volume, res_tab,
             xyz.append((x,y,z))
         
         X = np.array(X)
+        # gradcam for models with tabular data only doesnt make sense, so second check is ok
         if "ontram" in cnn.name and not isinstance(cnn.input, list):
             out = 1-fm.sigmoid(cnn.predict(X))
         elif "ontram" in cnn.name and isinstance(cnn.input, list):  
-            filtered_df = tabular_df[tabular_df['p_id'] == res_tab['p_id'][0]].drop('p_id', axis=1).values
+            # ToDo: make function for CIBLSX prediction (also used in gradcam)
+            # filtered_df = tabular_df[tabular_df['p_id'] == res_tab['p_id'][0]].drop('p_id', axis=1).values
+            filtered_df = tabular_df.drop(['index', 'p_id'], axis=1).values
             X_tab_occ = np.tile(filtered_df, (len(X), 1))
 
             occ_dataset_pred = ((X, X_tab_occ))
