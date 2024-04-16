@@ -64,7 +64,6 @@ def stroke_binary_3d(input_dim = (128, 128, 28,1),
     elif last_activation == list(valid_activation)[2]:
         out = layers.Dense(units=output_dim, activation = last_activation)(x) # softmax (output_dim must be at least 2)
     
-    
     # Define the model.
     model_3d = Model(inputs=inputs, outputs=out, name = "cnn_3d_")
     
@@ -87,29 +86,29 @@ def img_model_linear_final(input_shape, output_shape, activation = "linear"):
     in_ = keras.Input(shape = input_shape)
 
     # conv block 0
-    x = keras.layers.Convolution3D(32, kernel_size=(3, 3, 3), padding = 'same', activation = 'relu')(in_)
+    x = keras.layers.Convolution3D(32, kernel_size=(3, 3, 3), padding = 'same', activation = 'relu', name = "CIB_Conv3D0")(in_)
     x = keras.layers.MaxPooling3D(pool_size=(2, 2, 2))(x)
     # conv block 1
-    x = keras.layers.Convolution3D(32, kernel_size=(3, 3, 3), padding = 'same', activation = 'relu')(x)
+    x = keras.layers.Convolution3D(32, kernel_size=(3, 3, 3), padding = 'same', activation = 'relu', name = "CIB_Conv3D1")(x)
     x = keras.layers.MaxPooling3D(pool_size=(2, 2, 2))(x)
     # conv block 2
-    x = keras.layers.Convolution3D(64, kernel_size=(3, 3, 3), padding = 'same', activation = 'relu')(x)
+    x = keras.layers.Convolution3D(64, kernel_size=(3, 3, 3), padding = 'same', activation = 'relu', name = "CIB_Conv3D2")(x)
     x = keras.layers.MaxPooling3D(pool_size=(2, 2, 2))(x)
     # conv block 3
-    x = keras.layers.Convolution3D(64, kernel_size=(3, 3, 3), padding = 'same', activation = 'relu')(x)
+    x = keras.layers.Convolution3D(64, kernel_size=(3, 3, 3), padding = 'same', activation = 'relu', name = "CIB_Conv3D3")(x)
     x = keras.layers.MaxPooling3D(pool_size=(2, 2, 2))(x)
 
     # cnn to flat connection
     x = keras.layers.GlobalAveragePooling3D()(x) 
     
     # flat block
-    x = keras.layers.Dense(128, activation = 'relu')(x)
+    x = keras.layers.Dense(128, activation = 'relu', name = "CIB_Dense1")(x)
     x = keras.layers.Dropout(0.3)(x)
-    x = keras.layers.Dense(128, activation = 'relu')(x)
+    x = keras.layers.Dense(128, activation = 'relu', name = "CIB_Dense2")(x)
     x = keras.layers.Dropout(0.3)(x)
     out_ = keras.layers.Dense(output_shape, activation = activation, use_bias = False, 
-                              name = "dense_complex_intercept")(x) 
-    nn_im = keras.Model(inputs = in_, outputs = out_, name = "mod_complex_intercept")
+                              name = "CIB_dense_complex_intercept")(x) 
+    nn_im = keras.Model(inputs = in_, outputs = out_, name = "CIB_mod_complex_intercept")
     return nn_im
 
 # Define the 3d cnn model parameters for binary stroke classification based on the current model version
@@ -147,7 +146,8 @@ def model_init(version,
                batch_size = 6,
                input_dim = (128, 128, 28, 1),
                input_dim_tab = None,
-               weights_tab_init = None):
+               weights_tab_init = None,
+               cnn_weights_init_path = None):
     
     # version: string, model version, e.g. 10Fold_sigmoid_V0
     # output_dim: integer, if sigmoid, linear activation or ontram 1 must be used, if softmax then 2
@@ -170,12 +170,38 @@ def model_init(version,
             metrics=["acc", tf.keras.metrics.AUC()])
     elif "CIBLSX" in version:
         mbl = img_model_linear_final(input_dim, output_dim)
-        mls = mod_linear_shift(input_dim_tab, weights=weights_tab_init)
-        model_3d = ontram(mbl, mls)             
+        mls = mod_linear_shift(input_dim_tab, weights=weights_tab_init)     
+        model_3d = ontram(mbl, mls)   
+        
+        if cnn_weights_init_path is not None:
+            model_3d_cib = ontram(mbl) 
+            model_3d_cib.load_weights(cnn_weights_init_path) 
+
+            ciblsx_namelist = []
+            for layer in model_3d.layers:
+                ciblsx_namelist.append(layer.name)
+
+            cib_namelist = []
+            for layer in model_3d_cib.layers:
+                cib_namelist.append(layer.name)
+
+            cib_namelist_filter = [name for name in cib_namelist if "CIB" in name]
+
+            ciblsx_indexlist = []
+            for name in cib_namelist_filter:
+                ciblsx_indexlist.append(ciblsx_namelist.index(name))
+
+            cib_indexlist = []
+            for name in cib_namelist_filter:
+                cib_indexlist.append(cib_namelist.index(name))
+
+            for old, new in zip(cib_indexlist,ciblsx_indexlist):
+                model_3d.layers[new].set_weights(model_3d_cib.layers[old].get_weights())
 
         model_3d.compile(optimizer=keras.optimizers.Adam(learning_rate=learning_rate),
                                         loss=ontram_loss(C, batch_size),
-                                        metrics=[ontram_acc(C, batch_size)])
+                                        metrics=[ontram_acc(C, batch_size)])   
+    
     elif "CIB" in version:
         mbl = img_model_linear_final(input_dim, output_dim)
         model_3d = ontram(mbl)             
@@ -229,5 +255,62 @@ def get_last_conv_layer(model):
 
 
 
+def model_init_test(version, 
+               output_dim,
+               LOSS,
+               layer_connection = None,
+               last_activation = None,
+               C = None,
+               learning_rate = 5*1e-5,
+               batch_size = 6,
+               input_dim = (128, 128, 28, 1),
+               input_dim_tab = None,
+               weights_tab_init = None,
+               cnn_weights_init = None):
+    
+    # version: string, model version, e.g. 10Fold_sigmoid_V0
+    # output_dim: integer, if sigmoid, linear activation or ontram 1 must be used, if softmax then 2
+    # LOSS: string or function, loss function
+    # layer_connection: string, either "flatten" or "globalAveragePooling" or None
+    # last_activation: string, either "sigmoid", "linear" or "softmax" or None
+    # C: integer, number of classes for Ontram
+    # learning_rate: float, learning rate for optimizer
+    # input_dim: tuple of integers, shape of input data
+    # input_dim_tab: tuple of integers, shape of input data for tabular data
 
+    if ("sigmoid" or "softmax" or "andrea_split") in version:
+        model_3d = stroke_binary_3d(input_dim = input_dim,
+                               output_dim = output_dim,
+                               layer_connection = layer_connection,
+                               last_activation = last_activation)
+        model_3d.compile(
+            loss=LOSS,
+            optimizer=keras.optimizers.Adam(learning_rate=learning_rate),
+            metrics=["acc", tf.keras.metrics.AUC()])
+    elif "CIBLSX" in version:
+        mbl = img_model_linear_final(input_dim, output_dim)
+        mls = mod_linear_shift(input_dim_tab, weights=None)
+        model_3d = ontram(mbl, mls)   
+        
+        if cnn_weights_init is not None:
+            model_3d.load_weights(cnn_weights_init)
+        
+        if weights_tab_init is not None:
+            mls = mod_linear_shift(input_dim_tab, weights=weights_tab_init) 
+
+        return model_3d
+
+        model_3d.compile(optimizer=keras.optimizers.Adam(learning_rate=learning_rate),
+                                        loss=ontram_loss(C, batch_size),
+                                        metrics=[ontram_acc(C, batch_size)])
+        
+    elif "CIB" in version:
+        mbl = img_model_linear_final(input_dim, output_dim)
+        model_3d = ontram(mbl)             
+
+        model_3d.compile(optimizer=keras.optimizers.Adam(learning_rate=learning_rate),
+                                        loss=ontram_loss(C, batch_size),
+                                        metrics=[ontram_acc(C, batch_size)])
+
+    return model_3d
 
