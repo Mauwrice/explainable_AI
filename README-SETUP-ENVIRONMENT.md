@@ -57,8 +57,17 @@ The following output will be presented:
 
 One can now access the `jupyter notebook` instance under the address `http://127.0.0.1:8888/?token=6b42a391ed0eac976b3bab966aa3b5131791589298f5abf4` where the `token` part of the url will change with every startup of the image. Replace `127.0.0.1` in the url with the workstations IP address or with the workstations domain name and replace the port `8888` with the port specified in the command (``-p 8383:8888``), so in this case `8383`. 
 
-For example: `http://gpu-server.uni.edu:8383/?token=6b42a3.....`
+For example: `http://gpu-server.zhaw.ch:8383/?token=6b42a3.....`
 
+### Replace token with password
+It is possible to replace the random token with a password. For this one can add an environment varialbe `JUPYTER_TOKEN` to the startup command. 
+```bash
+...
+    -p 8383:8888 \
+    -e JUPYTER_TOKEN=my-personal-password \
+    --gpus device=0 \
+...
+```
 
 ## Docker Command Explained
 Find the complete information in the docker documentaion. https://docs.docker.com/engine/reference/run/
