@@ -3,7 +3,7 @@
 ## Data pahts
 The Docker container for the image stroke_perfusion:2.2.0-publish will start in the working directory /tf/notebooks. The rest of the filesystem and additionally mounted directories are accessible via unix paths.
 
-As defined in the run script, [README-SETUP-ENVIRONMENT.md](README-SETUP-ENVIRONMENT.md), the parameter `--mount type=bind,source="$(pwd)", target=/tf/notebooks` mounts the local directory where the command was executed from, into the Docker container under the path `/tf/notebooks`. This means when we create a directory `data` in the current directory (local file system) it will be available under `/tf/notebooks/data/` in the Docker container as absolute path or `./data` as relative path.
+As defined in the run script, [README-01-SETUP-ENVIRONMENT.md](README-01-SETUP-ENVIRONMENT.md), the parameter `--mount type=bind,source="$(pwd)", target=/tf/notebooks` mounts the local directory where the command was executed from, into the Docker container under the path `/tf/notebooks`. This means when we create a directory `data` in the current directory (local file system) it will be available under `/tf/notebooks/data/` in the Docker container as absolute path or `./data` as relative path.
 
 Note: *`"$(pwd)` could be replaced with a fixed path, depending on the environment.*
 
