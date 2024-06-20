@@ -28,7 +28,7 @@ def grad_cam_3d(img, model_3d, layer,
             [model_3d.get_layer(layer).output, model_3d.output])
     elif model_3d.name == "mod_ontram":
         grad_model = tf.keras.models.Model([model_3d.inputs], 
-            [model_3d.get_layer(layer).output, model_3d.get_layer("dense_complex_intercept").output])
+            [model_3d.get_layer(layer).output, model_3d.get_layer("CIB_dense_complex_intercept").output])
     
     # Then, we compute the GRADIENT for our input image
     # with respect to the activations of the last conv layer
