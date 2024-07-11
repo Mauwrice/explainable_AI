@@ -17,8 +17,7 @@ One defines the parameters `version`, `model_version`,
 ## Model Analysis
 The model is recreated according to the previously defined parameters and the weights are loaded. 
 
-> [!IMPORTANT]  
-> TODO: Why tune the weights?
+The tuned weights are also calculated. This means that for every ensemble each of the ensembles members get their weight tuned in such a way that, for one data split, they optimally predict the outcome of the validation data set.
 
 Now for every split and every member of the ensemble predictions for the binary mrs outcome are made.
 

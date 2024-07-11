@@ -23,7 +23,7 @@ Define two directories here:
 It is expected that the .h5 file contains the following structure:
 
 `X`: The image voxels per patient with dimension `(128, 128, 28)` per patient.  
-`Y_img`: Not used. A label indicating **TODO: fill in what it actually does** per voxel slice. (28 slices)  
+`Y_img`: Not used. A label indicating if a stroke is present per voxel slice. (28 slices)  
 `Y_pat`: Indicating if the patient had a TIA (trans ischemic attack).  
 `pat`:   The patients id.
 
