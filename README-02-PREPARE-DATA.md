@@ -37,7 +37,7 @@ with h5py.File(path_img, "r") as h5:
 ```
 
 ### .csv data structure
-**TODO: Fill out all columns:** Contains the following columns:  
+Contains the following columns:  
 "p_id"  
 "mrs3"  
 "age"  
@@ -53,7 +53,7 @@ with h5py.File(path_img, "r") as h5:
 "rf_smokery"  
 "rf_atrial_fibrillationy"  
 "rf_chdy"  
-**"one-missing-colum"**
+"eventtia"  
 
 #### Target variable Y_new
 The binary target variable, **0**, and **1** gets created by splitting the modified ranking scale (mrs3) outcome after three months in the following groups: 
