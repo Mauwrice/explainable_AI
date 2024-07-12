@@ -250,8 +250,11 @@ def set_generate_model_name(model_version, layer_connection, last_activation, pa
 
 def get_last_conv_layer(model):
     vis_layers = [i.name for i in model.layers]
-    vis_layers = [vis_layer for vis_layer in vis_layers if vis_layer.startswith("conv")]
+    vis_layers = [vis_layer for vis_layer in vis_layers if vis_layer.startswith("CIB_Conv")]
     return vis_layers[-1]
+
+
+#vis_layers = [vis_layer for vis_layer in vis_layers if vis_layer.startswith("conv")]
 
 
 
