@@ -138,6 +138,7 @@ def volume_occlusion(volume, res_tab,
         # gradcam for models with tabular data only doesnt make sense, so second check is ok
         if "ontram" in cnn.name and not isinstance(cnn.input, list):
             out = 1-fm.sigmoid(cnn.predict(X))
+        
         elif "ontram" in cnn.name and isinstance(cnn.input, list):  
             # ToDo: make function for CIBLSX prediction (also used in gradcam)
             # filtered_df = tabular_df[tabular_df['p_id'] == res_tab['p_id'][0]].drop('p_id', axis=1).values

@@ -252,7 +252,7 @@ def cal_plot(dat, x_vals, y_vals, lwr_vals, upr_vals, alpha = 1, show = True, co
     
     plt.xlim(0, 1)
     plt.ylim(0, 1)
-
+    plt.title("Calibration plot of CIB and CIB-LSX dTM")
     sns.lineplot(
         data=dat, x=x_vals, y=y_vals, 
         marker="o",
@@ -269,6 +269,7 @@ def cal_plot(dat, x_vals, y_vals, lwr_vals, upr_vals, alpha = 1, show = True, co
                     alpha = alpha,
                     color = col)
     if show:
+        plt.savefig("/tf/notebooks/schnemau/xAI_stroke_3d/data/calibration_plot.png", dpi=300)
         plt.show()
         
 # inverse sigmoid function
