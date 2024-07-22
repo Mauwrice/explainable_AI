@@ -1,5 +1,6 @@
 import tensorflow as tf
 import numpy as np
+import warnings
 
 from skimage.transform import resize
 
@@ -91,6 +92,9 @@ def grad_cam_3d(img, model_3d, layer,
     heatmap = output @ weights[..., tf.newaxis]
     heatmap = tf.squeeze(heatmap)
     heatmap = resize(heatmap, img.shape[1:])
+
+    # print(heatmap)
+    # print(relu_hm)
     
     # For visualization purpose, we will also normalize the heatmap between 0 & 1
     if inv_hm:
@@ -98,7 +102,10 @@ def grad_cam_3d(img, model_3d, layer,
     
     if normalize:
         if relu_hm: #relu (max to 1)
-            heatmap = tf.maximum(heatmap, 0) / tf.math.reduce_max(heatmap)
+            if tf.math.reduce_max(heatmap) != 0:
+                heatmap = tf.maximum(heatmap, 0) / tf.math.reduce_max(heatmap)
+            else:
+                heatmap = tf.maximum(heatmap, 0)
         else:
             # normalize heatmap between -1 and 1 (absolute max is then -1 or 1)
             heatmap_min_max = [tf.math.reduce_min(heatmap), tf.math.reduce_max(heatmap)]
@@ -112,6 +119,8 @@ def grad_cam_3d(img, model_3d, layer,
         # else: heatmap is already numpy because of resize
     
     resized_img = img.reshape(img.shape[1:])
+
+    # print(heatmap)
     
     return heatmap, resized_img
 
@@ -187,18 +196,20 @@ def multi_layers_grad_cam_3d(img, model_3d, layers, tabular_df = None,
         heatmap = np.median(h_l, axis = 0)
     elif mode == "max":
         heatmap = np.max(h_l, axis = 0) 
+
+    # print(heatmap)
         
     ## Normalize heatmap
-    if normalize and pos_hm in ["last", "all"] and heatmap.max() != 0:
+    if normalize and pos_hm in ["last", "all"] and heatmap.max() != 0 and heatmap.max() != heatmap.min():
         heatmap = ((heatmap - heatmap.min())/(heatmap.max()-heatmap.min()))
-    elif normalize and pos_hm == "none" and heatmap.max() != 0:
+    elif normalize and pos_hm == "none" and heatmap.max() != 0 and heatmap.max() != heatmap.min():
         heatmap_min_max = [tf.math.reduce_min(heatmap), tf.math.reduce_max(heatmap)]
         heatmap_abs_max = tf.math.reduce_max(tf.math.abs(heatmap_min_max))
         heatmap = heatmap / heatmap_abs_max
         heatmap = heatmap.numpy()
     elif normalize:
-        heatmap = 0
-        raise Warning("Highest heatmap value is smaller or equal to 0 in multi_layers_grad_cam_3d")
+        heatmap = np.full(heatmap.shape, 0)
+        warnings.warn("Highest heatmap value is smaller or equal to 0 in multi_layers_grad_cam_3d")
     
     return (heatmap, resized_img)
 
@@ -266,16 +277,16 @@ def multi_models_grad_cam_3d(img, cnn, model_names, layers,
         heatmap = np.average(h_l, axis=0, weights=weights)
         
     ## Normalize heatmap
-    if normalize and pos_hm in ["last", "all"] and heatmap.max() != 0:
+    if normalize and pos_hm in ["last", "all"] and heatmap.max() != 0 and heatmap.max() != heatmap.min():
         heatmap = ((heatmap - heatmap.min())/(heatmap.max()-heatmap.min()))
-    elif normalize and pos_hm == "none" and heatmap.max() != 0:
+    elif normalize and pos_hm == "none" and heatmap.max() != 0 and heatmap.max() != heatmap.min():
         heatmap_min_max = [tf.math.reduce_min(heatmap), tf.math.reduce_max(heatmap)]
         heatmap_abs_max = tf.math.reduce_max(tf.math.abs(heatmap_min_max))
         heatmap = heatmap / heatmap_abs_max
         heatmap = heatmap.numpy()
     elif normalize:
-        heatmap = 0
-        raise Warning("Highest heatmap value is smaller or equal to 0 in multi_models_grad_cam_3d")
+        heatmap = np.full(heatmap.shape, 0)
+        warnings.warn("Highest heatmap value is smaller or equal to 0 in multi_models_grad_cam_3d")
         
     ## Extract max slice and mean std of heatmap
     target_shape = h_l.shape[:-1]

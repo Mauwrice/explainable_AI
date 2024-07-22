@@ -309,3 +309,6 @@ def normalize_heatmap(hm, both_directions = False, hm_min_max = None):
         hm = hm / hm_abs_max
 
     return hm
+
+def min_max_norm(x):
+    return (x - np.min(x)) / (np.max(x) - np.min(x))
