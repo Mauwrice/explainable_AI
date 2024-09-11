@@ -56,7 +56,8 @@ The binary outcome is prepresented by a dichotomized modified Rankin Scale (mRS)
 
 
 
-
+## Setting up the environment and starting training
+We have documented this process in the file [README-SETUP-ENVIRONMENT.md](README-SETUP-ENVIRONMENT.md)
 
 
 
